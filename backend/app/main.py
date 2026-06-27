@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import agent, dashboard, health
 
-app = FastAPI(title="Supplier BI Backend")
+app = FastAPI(title="Retail BI Backend")
 
 app.add_middleware(
     CORSMiddleware,

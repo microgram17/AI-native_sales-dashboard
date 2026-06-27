@@ -20,8 +20,7 @@ services:
     volumes:
       - ./backend/app:/app/app
     environment:
-      - MCP_SERVER_URL=http://mcp_server:8000/mcp
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/retail_bi
+      - MCP_SERVER_URL=http://mcp_server:8000/mcp/
     depends_on:
       - mcp_server
       - postgres
@@ -34,15 +33,17 @@ services:
     volumes:
       - ./mcp_server/app:/app/app
       - ./data:/data
+      - ./mcp_server/scripts:/app/scripts
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/retail_bi
+      - LEGACY_DATA_DIR=/data/legacy_exports
     depends_on:
       - postgres
 
   postgres:
     image: postgres:17
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_DB=retail_bi
       - POSTGRES_USER=postgres

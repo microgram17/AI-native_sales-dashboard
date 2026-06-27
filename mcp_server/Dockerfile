@@ -8,7 +8,8 @@ COPY pyproject.toml uv.lock* ./
 RUN uv sync --frozen || uv sync
 
 COPY app ./app
+COPY scripts ./scripts
 
 EXPOSE 8000
 
-CMD ["uv", "run", "python", "app/server.py"]
+CMD ["uv", "run", "python", "-m", "app.server"]

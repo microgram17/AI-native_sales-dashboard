@@ -1,16 +1,19 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+
+from app.schemas.agent import AgentRequest, AgentResponse
+from app.services.agent_service import AgentService
 
 router = APIRouter()
 
 
-class AgentRequest(BaseModel):
-    message: str
+def get_agent_service() -> AgentService:
+    return AgentService()
 
 
 @router.post("/chat")
-def chat(request: AgentRequest) -> dict:
-    return {
-        "answer": f"Agent skeleton received: {request.message}",
-        "chart": None,
-    }
+async def chat(
+    request: AgentRequest,
+    service: AgentService = Depends(get_agent_service),
+) -> AgentResponse:
+    result = await service.answer(request.message)
+    return AgentResponse.model_validate(result)
