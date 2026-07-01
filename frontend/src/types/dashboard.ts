@@ -1,3 +1,13 @@
+export interface DemoUser {
+  user_id: string
+  display_name: string
+  supplier_codes: string[]
+}
+
+export interface DemoUsersResponse {
+  users: DemoUser[]
+}
+
 export interface SupplierInfo {
   supplier_code: string
   supplier_name: string

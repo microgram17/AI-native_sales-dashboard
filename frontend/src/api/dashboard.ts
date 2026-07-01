@@ -1,5 +1,6 @@
 import { apiFetch } from './client'
 import type {
+  DemoUsersResponse,
   SuppliersResponse,
   SupplierSummary,
   RevenueTrendResponse,
@@ -7,6 +8,9 @@ import type {
 } from '../types/dashboard'
 
 export const dashboardApi = {
+  listDemoUsers: () =>
+    apiFetch<DemoUsersResponse>('/api/demo/users'),
+
   listSuppliers: () =>
     apiFetch<SuppliersResponse>('/api/dashboard/suppliers'),
 

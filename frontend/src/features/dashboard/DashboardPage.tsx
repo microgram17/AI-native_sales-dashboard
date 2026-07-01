@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { dashboardApi } from '../../api/dashboard'
+import { setDemoUser } from '../../api/client'
 import { KpiCard } from './components/KpiCard'
 import { SupplierSelector } from './components/SupplierSelector'
+import { UserSelector } from './components/UserSelector'
 import { RevenueTrendChart } from './components/RevenueTrendChart'
 import { TopProductsTable } from './components/TopProductsTable'
+import { AgentChat } from './components/AgentChat'
 
 const DEFAULT_SUPPLIER = 'SUP-001'
 
@@ -16,11 +19,39 @@ const fmtCurrency = (n: number) =>
   }).format(n)
 
 export function DashboardPage() {
+  const [selectedUser, setSelectedUser] = useState('')
   const [supplierCode, setSupplierCode] = useState(DEFAULT_SUPPLIER)
 
+  const { data: demoUsersData } = useQuery({
+    queryKey: ['demoUsers'],
+    queryFn: () => dashboardApi.listDemoUsers(),
+  })
+
+  // Set the first demo user once data loads
+  useEffect(() => {
+    if (demoUsersData?.users.length && !selectedUser) {
+      const first = demoUsersData.users[0]
+      setSelectedUser(first.user_id)
+      setDemoUser(first.user_id)
+      if (first.supplier_codes.length) {
+        setSupplierCode(first.supplier_codes[0])
+      }
+    }
+  }, [demoUsersData, selectedUser])
+
+  function handleUserChange(userId: string) {
+    const user = demoUsersData?.users.find((u) => u.user_id === userId)
+    setSelectedUser(userId)
+    setDemoUser(userId)
+    if (user?.supplier_codes.length) {
+      setSupplierCode(user.supplier_codes[0])
+    }
+  }
+
   const { data: suppliersData } = useQuery({
-    queryKey: ['suppliers'],
+    queryKey: ['suppliers', selectedUser],
     queryFn: () => dashboardApi.listSuppliers(),
+    enabled: !!selectedUser,
   })
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
@@ -44,16 +75,23 @@ export function DashboardPage() {
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="dashboard-title">
-          <h1>Supplier Dashboard</h1>
-          {summary?.supplier_name && (
-            <span className="supplier-tagline">{summary.supplier_name}</span>
-          )}
-        </div>
-        <SupplierSelector
-          suppliers={suppliers}
-          selected={supplierCode}
-          onChange={setSupplierCode}
-        />
+            <h1>Supplier Dashboard</h1>
+            {summary?.supplier_name && (
+              <span className="supplier-tagline">{summary.supplier_name}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <UserSelector
+              users={demoUsersData?.users ?? []}
+              selected={selectedUser}
+              onChange={handleUserChange}
+            />
+            <SupplierSelector
+              suppliers={suppliers}
+              selected={supplierCode}
+              onChange={setSupplierCode}
+            />
+          </div>
       </header>
 
       <section className="kpi-grid">
@@ -106,6 +144,11 @@ export function DashboardPage() {
           />
         </section>
       </div>
+
+      <section className="panel">
+        <h2>Ask the Agent</h2>
+        <AgentChat supplierCode={supplierCode} />
+      </section>
     </div>
   )
 }

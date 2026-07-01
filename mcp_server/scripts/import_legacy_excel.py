@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import os
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,7 @@ from app.db.connection import get_connection
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "legacy_exports"
+DEFAULT_DATA_DIR = Path(os.getenv("LEGACY_DATA_DIR") or PROJECT_ROOT / "data" / "legacy_exports")
 
 
 def clean_records(dataframe: pd.DataFrame) -> list[dict[str, Any]]:
@@ -26,8 +27,9 @@ def load_excel_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
     return pd.read_excel(path, sheet_name=sheet_name)
 
 
-def parse_month_start(month_value: str) -> date:
-    return pd.to_datetime(f"{month_value}-01").date()
+def parse_month_start(month_value: Any) -> date:
+    parsed = pd.to_datetime(month_value).date()
+    return parsed.replace(day=1)
 
 
 def insert_suppliers(conn: Connection, suppliers: pd.DataFrame) -> int:
@@ -138,6 +140,7 @@ def insert_orders(conn: Connection, raw_sales: pd.DataFrame) -> int:
 
     orders["order_date"] = pd.to_datetime(orders["order_date"]).dt.date
     orders["week_start"] = pd.to_datetime(orders["week_start"]).dt.date
+    orders["month_start"] = orders["month"].apply(parse_month_start)
 
     records = clean_records(orders)
 
@@ -148,7 +151,7 @@ def insert_orders(conn: Connection, raw_sales: pd.DataFrame) -> int:
                 order_id,
                 order_date,
                 week_start,
-                month,
+                month_start,
                 store_id,
                 customer_segment,
                 anonymized_customer_id
@@ -157,7 +160,7 @@ def insert_orders(conn: Connection, raw_sales: pd.DataFrame) -> int:
                 %(order_id)s,
                 %(order_date)s,
                 %(week_start)s,
-                %(month)s,
+                %(month_start)s,
                 %(store_id)s,
                 %(customer_segment)s,
                 %(anonymized_customer_id)s
@@ -229,12 +232,12 @@ def insert_market_benchmarks(
     weekly = weekly_reports.copy()
     weekly["period_type"] = "week"
     weekly["period_start"] = pd.to_datetime(weekly["week_start"]).dt.date
-    weekly["period_label"] = weekly["week_start"]
+    weekly["period_label"] = weekly["period_start"].astype(str)
 
     monthly = monthly_reports.copy()
     monthly["period_type"] = "month"
     monthly["period_start"] = monthly["month"].apply(parse_month_start)
-    monthly["period_label"] = monthly["month"]
+    monthly["period_label"] = monthly["period_start"].apply(lambda value: value.strftime("%Y-%m"))
 
     benchmarks = pd.concat([weekly, monthly], ignore_index=True)
 

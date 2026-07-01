@@ -2,10 +2,11 @@ from pydantic import BaseModel
 
 
 class AgentRequest(BaseModel):
-    message: str
+    supplier_code: str
+    question: str
 
 
 class AgentResponse(BaseModel):
     answer: str
-    supported: bool
-    message: str
+    visualization: dict
+    source: dict

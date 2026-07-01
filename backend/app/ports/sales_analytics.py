@@ -1,7 +1,13 @@
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class SalesAnalyticsPort(Protocol):
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        ...
+
+    async def list_tools(self) -> list[dict[str, Any]]:
+        ...
+
     async def get_supplier_summary(self, supplier_code: str) -> dict:
         ...
 
@@ -22,3 +28,4 @@ class SalesAnalyticsPort(Protocol):
 
     async def list_suppliers(self) -> dict:
         ...
+

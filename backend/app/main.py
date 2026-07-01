@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
-from app.api import agent, dashboard, health
+from app.api import agent, dashboard, health, tenancy
+
+load_dotenv()
 
 app = FastAPI(title="Retail BI Backend")
 
@@ -14,5 +17,6 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api")
+app.include_router(tenancy.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api/dashboard")
 app.include_router(agent.router, prefix="/api/agent")
