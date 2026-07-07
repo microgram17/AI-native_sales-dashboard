@@ -1,0 +1,178 @@
+product_id,supplier_id,product_name,category,subcategory,base_price_sek,base_cost_sek,launch_date,active
+NORD-TSH-001,NORDVALE,Premium Cotton Tee,T-Shirts,Basic Tee,217.1,118.23,2023-07-11,True
+NORD-TSH-002,NORDVALE,Weekend Tee,T-Shirts,Basic Tee,211.25,90.47,2026-01-21,True
+NORD-TSH-003,NORDVALE,Everyday Essential Tee,T-Shirts,Relaxed Fit,216.85,89.43,2023-01-14,True
+NORD-TSH-004,NORDVALE,Organic Soft Tee,T-Shirts,Relaxed Fit,167.05,87.46,2024-11-20,True
+NORD-TSH-005,NORDVALE,Washed Cotton Tee,T-Shirts,Relaxed Fit,118.34,48.04,2026-05-21,True
+NORD-TSH-006,NORDVALE,Essential Crew Neck,T-Shirts,Basic Tee,244.95,112.39,2025-02-14,True
+NORD-TSH-007,NORDVALE,Slim Fit T-Shirt,T-Shirts,Organic Cotton,264.88,117.83,2025-01-10,True
+NORD-TSH-008,NORDVALE,Classic Cotton Tee,T-Shirts,Basic Tee,108.16,55.3,2024-08-15,True
+NORD-TSH-009,NORDVALE,Relaxed Fit T-Shirt,T-Shirts,Premium Tee,272.3,132.17,2025-07-17,True
+NORD-HOD-010,NORDVALE,Lightweight Zip-Up,Hoodies,Zip Hoodie,480.7,224.43,2026-02-14,True
+NORD-HOD-011,NORDVALE,Minimal Logo Hoodie,Hoodies,Oversized Hoodie,820.43,337.49,2024-04-14,True
+NORD-HOD-012,NORDVALE,Essential Zip Hoodie,Hoodies,Cropped Hoodie,532.87,261.35,2026-03-07,True
+NORD-HOD-013,NORDVALE,Classic Pullover Hoodie,Hoodies,Oversized Hoodie,505.31,227.44,2025-07-28,True
+NORD-HOD-014,NORDVALE,Weekend Pullover,Hoodies,Zip Hoodie,522.31,230.55,2024-06-22,True
+NORD-HOD-015,NORDVALE,Full-Zip Hoodie,Hoodies,Cropped Hoodie,847.91,393.5,2024-03-25,True
+NORD-HOD-016,NORDVALE,French Terry Hoodie,Hoodies,Cropped Hoodie,444.45,228.18,2023-08-13,True
+NORD-KNT-017,NORDVALE,Merino Crew Neck Sweater,Knitwear,Crew Neck,807.17,389.72,2026-01-04,True
+NORD-KNT-018,NORDVALE,Relaxed Cardigan,Knitwear,Cardigan,465.93,202.58,2025-07-18,True
+NORD-KNT-019,NORDVALE,Classic Cardigan,Knitwear,Cardigan,982.13,378.81,2025-11-05,True
+NORD-KNT-020,NORDVALE,Cable Knit Jumper,Knitwear,Cardigan,904.0,383.16,2024-02-12,True
+NORD-KNT-021,NORDVALE,Oversized Knit Sweater,Knitwear,Crew Neck,758.37,323.6,2023-08-18,True
+NORD-KNT-022,NORDVALE,Wool-Blend Jumper,Knitwear,Cardigan,542.67,251.73,2026-03-07,True
+NORD-KNT-023,NORDVALE,Ribbed Turtleneck,Knitwear,Crew Neck,838.14,316.48,2025-12-26,True
+NORD-KNT-024,NORDVALE,Fine Knit V-Neck,Knitwear,V-Neck,794.85,284.53,2023-12-05,True
+NORD-SHT-025,NORDVALE,Oxford Button-Down,Shirts,Casual Shirt,335.77,164.66,2023-02-13,True
+NORD-SHT-026,NORDVALE,Slim Fit Shirt,Shirts,Formal Shirt,251.52,99.05,2023-05-01,True
+NORD-SHT-027,NORDVALE,Linen Casual Shirt,Shirts,Linen Shirt,273.8,127.13,2025-09-21,True
+NORD-SHT-028,NORDVALE,Weekend Shirt,Shirts,Formal Shirt,502.17,184.62,2026-03-26,True
+NORD-SOK-029,NORDVALE,Thermal Wool Socks,Socks,Thermal Socks,91.36,39.28,2023-04-21,True
+NORD-SOK-030,NORDVALE,Sport Ankle Socks,Socks,Ankle Socks,55.06,21.52,2023-08-12,True
+NORD-SOK-031,NORDVALE,Cosy Crew Socks,Socks,No-Show Socks,63.02,29.78,2025-08-05,True
+NORD-SOK-032,NORDVALE,Ankle Socks 3-Pack,Socks,Ankle Socks,93.31,34.6,2026-02-01,True
+URBN-TSH-001,URBAN_THREADS,Weekend Tee,T-Shirts,Premium Tee,271.93,107.84,2023-12-04,True
+URBN-TSH-002,URBAN_THREADS,Essential Crew Neck,T-Shirts,Organic Cotton,284.3,118.42,2024-08-07,True
+URBN-TSH-003,URBAN_THREADS,Organic Soft Tee,T-Shirts,Relaxed Fit,129.96,64.92,2023-04-30,True
+URBN-TSH-004,URBAN_THREADS,Premium Cotton Tee,T-Shirts,Organic Cotton,110.43,49.77,2025-10-26,True
+URBN-TSH-005,URBAN_THREADS,Slim Fit T-Shirt,T-Shirts,Premium Tee,110.38,51.18,2024-01-16,False
+URBN-TSH-006,URBAN_THREADS,Relaxed Fit T-Shirt,T-Shirts,Premium Tee,179.76,70.09,2026-03-12,True
+URBN-TSH-007,URBAN_THREADS,Everyday Essential Tee,T-Shirts,Basic Tee,222.88,106.7,2026-04-10,True
+URBN-TSH-008,URBAN_THREADS,Classic Cotton Tee,T-Shirts,Organic Cotton,285.94,147.34,2024-10-05,True
+URBN-HOD-009,URBAN_THREADS,Soft Terry Hoodie,Hoodies,Pullover Hoodie,667.82,299.97,2023-09-29,True
+URBN-HOD-010,URBAN_THREADS,Weekend Pullover,Hoodies,Zip Hoodie,583.76,290.66,2026-01-17,True
+URBN-HOD-011,URBAN_THREADS,Full-Zip Hoodie,Hoodies,Pullover Hoodie,732.93,324.22,2023-08-01,True
+URBN-HOD-012,URBAN_THREADS,Lightweight Zip-Up,Hoodies,Pullover Hoodie,843.86,351.1,2023-11-15,True
+URBN-HOD-013,URBAN_THREADS,Classic Pullover Hoodie,Hoodies,Oversized Hoodie,500.8,215.95,2024-06-24,True
+URBN-HOD-014,URBAN_THREADS,French Terry Hoodie,Hoodies,Oversized Hoodie,851.67,341.98,2023-07-09,True
+URBN-HOD-015,URBAN_THREADS,Minimal Logo Hoodie,Hoodies,Pullover Hoodie,400.77,165.13,2024-06-20,True
+URBN-JKT-016,URBAN_THREADS,Lightweight Puffer,Jackets,Leather Jacket,860.25,495.64,2026-02-05,True
+URBN-JKT-017,URBAN_THREADS,Windbreaker Jacket,Jackets,Puffer Jacket,870.11,502.11,2023-03-23,True
+URBN-JKT-018,URBAN_THREADS,Tailored Blazer,Jackets,Puffer Jacket,1932.79,1119.6,2026-02-20,True
+URBN-JKT-019,URBAN_THREADS,Padded Winter Jacket,Jackets,Windbreaker,2454.52,1227.52,2024-04-29,True
+URBN-JKT-020,URBAN_THREADS,Oversized Blazer,Jackets,Puffer Jacket,2297.41,1481.93,2024-11-11,True
+URBN-JKT-021,URBAN_THREADS,Classic Denim Jacket,Jackets,Windbreaker,2162.8,1032.06,2024-05-23,True
+URBN-JKT-022,URBAN_THREADS,Quilted Jacket,Jackets,Denim Jacket,1449.32,930.83,2025-08-21,True
+URBN-JNS-023,URBAN_THREADS,Vintage Wash Jeans,Jeans,Skinny,761.61,303.88,2024-07-25,True
+URBN-JNS-024,URBAN_THREADS,Skinny Jeans,Jeans,Skinny,1042.61,419.01,2024-11-09,True
+URBN-JNS-025,URBAN_THREADS,Relaxed Fit Jeans,Jeans,Slim Fit,1200.63,580.42,2026-04-04,True
+URBN-JNS-026,URBAN_THREADS,Slim Fit Dark Jeans,Jeans,Relaxed Fit,529.61,231.16,2024-12-08,True
+URBN-JNS-027,URBAN_THREADS,Slim Tapered Jeans,Jeans,Relaxed Fit,848.12,324.16,2023-08-25,True
+URBN-ACC-028,URBAN_THREADS,Hair Clip Set,Accessories,Wallet,763.21,222.16,2026-06-30,True
+URBN-ACC-029,URBAN_THREADS,Keyring,Accessories,Wallet,602.83,227.84,2024-09-25,True
+URBN-ACC-030,URBAN_THREADS,Mini Pouch,Accessories,Phone Case,380.68,144.13,2023-09-18,True
+URBN-ACC-031,URBAN_THREADS,Card Holder,Accessories,Hair Accessories,573.12,168.27,2026-06-14,True
+ELMR-SHT-001,ELM_RIDGE,Summer Shirt,Shirts,Oxford Shirt,403.63,160.91,2025-11-12,True
+ELMR-SHT-002,ELM_RIDGE,Slim Fit Shirt,Shirts,Formal Shirt,479.6,219.38,2026-06-22,True
+ELMR-SHT-003,ELM_RIDGE,Relaxed Linen Shirt,Shirts,Formal Shirt,484.48,225.91,2024-02-12,True
+ELMR-SHT-004,ELM_RIDGE,Smart Casual Shirt,Shirts,Oxford Shirt,462.95,178.11,2025-07-21,True
+ELMR-SHT-005,ELM_RIDGE,Linen Casual Shirt,Shirts,Formal Shirt,500.42,221.39,2025-03-29,True
+ELMR-SHT-006,ELM_RIDGE,Weekend Shirt,Shirts,Casual Shirt,561.43,208.25,2023-08-07,True
+ELMR-SHT-007,ELM_RIDGE,Classic Formal Shirt,Shirts,Oxford Shirt,266.58,123.33,2023-09-06,True
+ELMR-SHT-008,ELM_RIDGE,Oxford Button-Down,Shirts,Linen Shirt,581.51,213.0,2026-06-08,True
+ELMR-TRS-009,ELM_RIDGE,Classic Chinos,Trousers,Chinos,858.49,371.07,2024-05-04,True
+ELMR-TRS-010,ELM_RIDGE,Slim Fit Trousers,Trousers,Chinos,539.7,246.29,2026-01-11,True
+ELMR-TRS-011,ELM_RIDGE,Pleated Trousers,Trousers,Wide Leg,537.76,220.37,2024-03-14,False
+ELMR-TRS-012,ELM_RIDGE,Relaxed Chinos,Trousers,Tapered,648.46,306.79,2025-05-10,True
+ELMR-TRS-013,ELM_RIDGE,Tapered Smart Trousers,Trousers,Slim Fit,913.04,365.65,2025-02-18,True
+ELMR-TRS-014,ELM_RIDGE,Straight Leg Trousers,Trousers,Chinos,578.17,259.77,2025-05-08,True
+ELMR-TRS-015,ELM_RIDGE,Wide-Leg Pants,Trousers,Wide Leg,691.94,321.42,2025-09-21,True
+ELMR-TRS-016,ELM_RIDGE,Linen Trousers,Trousers,Chinos,800.32,317.12,2023-12-05,True
+ELMR-JKT-017,ELM_RIDGE,Tailored Blazer,Jackets,Puffer Jacket,2272.65,1394.62,2024-06-16,True
+ELMR-JKT-018,ELM_RIDGE,Lightweight Puffer,Jackets,Puffer Jacket,1571.99,915.68,2025-02-15,True
+ELMR-JKT-019,ELM_RIDGE,Waterproof Shell,Jackets,Windbreaker,1227.86,778.0,2023-02-09,True
+ELMR-JKT-020,ELM_RIDGE,Padded Winter Jacket,Jackets,Blazer,1180.18,750.92,2023-03-24,True
+ELMR-JKT-021,ELM_RIDGE,Oversized Blazer,Jackets,Puffer Jacket,2225.69,1170.12,2024-05-03,True
+ELMR-JKT-022,ELM_RIDGE,Quilted Jacket,Jackets,Leather Jacket,2410.19,1342.46,2024-06-08,True
+ELMR-JKT-023,ELM_RIDGE,Windbreaker Jacket,Jackets,Puffer Jacket,1829.02,836.32,2023-08-23,True
+ELMR-JKT-024,ELM_RIDGE,Classic Denim Jacket,Jackets,Blazer,982.77,633.75,2024-09-30,True
+ELMR-KNT-025,ELM_RIDGE,Relaxed Cardigan,Knitwear,Crew Neck,876.74,363.94,2023-03-26,True
+ELMR-KNT-026,ELM_RIDGE,Cable Knit Jumper,Knitwear,Cardigan,440.37,177.41,2023-01-26,True
+ELMR-KNT-027,ELM_RIDGE,Classic Cardigan,Knitwear,Crew Neck,659.11,293.75,2025-07-30,True
+ELMR-KNT-028,ELM_RIDGE,Wool-Blend Jumper,Knitwear,Turtleneck,504.68,212.84,2024-07-07,True
+ELMR-KNT-029,ELM_RIDGE,Fine Knit V-Neck,Knitwear,Turtleneck,677.92,254.99,2026-04-28,True
+ELMR-BLT-030,ELM_RIDGE,Braided Leather Belt,Belts,Woven Belt,362.62,142.56,2023-02-28,True
+ELMR-BLT-031,ELM_RIDGE,Reversible Belt,Belts,Canvas Belt,223.24,73.74,2024-11-28,True
+ELMR-BLT-032,ELM_RIDGE,Wide Leather Belt,Belts,Woven Belt,394.41,161.14,2023-01-21,True
+ELMR-BLT-033,ELM_RIDGE,Slim Leather Belt,Belts,Leather Belt,401.03,151.07,2024-05-07,True
+AURA-ACT-001,AURA_ACTIVE,Active Tank Top,Activewear,Shorts,663.77,295.14,2026-02-07,True
+AURA-ACT-002,AURA_ACTIVE,Running Tee,Activewear,Sports Bra,896.64,374.29,2024-12-21,True
+AURA-ACT-003,AURA_ACTIVE,Training Hoodie,Activewear,Shorts,413.64,192.52,2024-01-30,True
+AURA-ACT-004,AURA_ACTIVE,Compression Tights,Activewear,Leggings,333.08,129.64,2024-07-20,True
+AURA-ACT-005,AURA_ACTIVE,Training Shorts,Activewear,Shorts,885.36,332.1,2024-08-29,True
+AURA-ACT-006,AURA_ACTIVE,Sports Bra,Activewear,Leggings,410.59,161.69,2023-09-17,True
+AURA-ACT-007,AURA_ACTIVE,Athletic Zip-Up,Activewear,Shorts,687.19,330.58,2025-10-02,True
+AURA-ACT-008,AURA_ACTIVE,High-Waist Leggings,Activewear,Sports Top,600.84,258.12,2025-06-21,True
+AURA-ACT-009,AURA_ACTIVE,Yoga Pants,Activewear,Sports Top,375.73,139.3,2023-08-22,True
+AURA-ACT-010,AURA_ACTIVE,Active Tank Top,Activewear,Sports Top,602.91,239.37,2023-11-07,True
+AURA-TSH-011,AURA_ACTIVE,Weekend Tee,T-Shirts,Relaxed Fit,280.7,140.2,2026-04-20,True
+AURA-TSH-012,AURA_ACTIVE,Slim Fit T-Shirt,T-Shirts,Organic Cotton,212.73,114.82,2023-07-23,True
+AURA-TSH-013,AURA_ACTIVE,Essential Crew Neck,T-Shirts,Premium Tee,151.93,81.46,2024-05-06,True
+AURA-TSH-014,AURA_ACTIVE,Washed Cotton Tee,T-Shirts,Basic Tee,180.7,78.21,2025-08-20,True
+AURA-TSH-015,AURA_ACTIVE,Everyday Essential Tee,T-Shirts,Premium Tee,156.62,78.61,2025-07-18,True
+AURA-TSH-016,AURA_ACTIVE,Organic Soft Tee,T-Shirts,Premium Tee,283.78,118.07,2026-04-22,True
+AURA-TSH-017,AURA_ACTIVE,Classic Cotton Tee,T-Shirts,Premium Tee,184.03,84.18,2023-11-02,True
+AURA-SOK-018,AURA_ACTIVE,No-Show Socks 5-Pack,Socks,No-Show Socks,117.87,46.56,2024-07-11,True
+AURA-SOK-019,AURA_ACTIVE,Bamboo Blend Socks,Socks,No-Show Socks,92.78,38.07,2025-06-03,True
+AURA-SOK-020,AURA_ACTIVE,Cosy Crew Socks,Socks,Thermal Socks,51.59,24.02,2026-03-24,True
+AURA-SOK-021,AURA_ACTIVE,Sport Ankle Socks,Socks,Ankle Socks,148.96,59.46,2024-07-05,True
+AURA-JKT-022,AURA_ACTIVE,Classic Denim Jacket,Jackets,Denim Jacket,1598.02,908.2,2024-10-19,True
+AURA-JKT-023,AURA_ACTIVE,Oversized Blazer,Jackets,Puffer Jacket,1359.67,695.15,2024-08-13,True
+AURA-JKT-024,AURA_ACTIVE,Waterproof Shell,Jackets,Windbreaker,2182.06,1178.27,2025-07-20,True
+AURA-JKT-025,AURA_ACTIVE,Windbreaker Jacket,Jackets,Blazer,1348.57,614.9,2025-04-07,True
+SOLB-BAG-001,SOLBERG_ACCESSORIES,Bucket Bag,Bags,Clutch,1058.99,444.21,2026-01-29,True
+SOLB-BAG-002,SOLBERG_ACCESSORIES,Structured Tote,Bags,Backpack,737.12,254.5,2023-09-06,False
+SOLB-BAG-003,SOLBERG_ACCESSORIES,Zip-Around Pouch,Bags,Crossbody Bag,1008.78,406.93,2023-01-29,True
+SOLB-BAG-004,SOLBERG_ACCESSORIES,Minimal Backpack,Bags,Tote Bag,760.45,328.8,2023-11-12,True
+SOLB-BAG-005,SOLBERG_ACCESSORIES,Leather Crossbody,Bags,Backpack,714.49,269.81,2025-08-25,True
+SOLB-BAG-006,SOLBERG_ACCESSORIES,Canvas Tote Bag,Bags,Crossbody Bag,682.59,212.78,2025-11-06,True
+SOLB-BLT-007,SOLBERG_ACCESSORIES,Wide Leather Belt,Belts,Leather Belt,247.99,100.49,2026-04-17,True
+SOLB-BLT-008,SOLBERG_ACCESSORIES,Braided Leather Belt,Belts,Woven Belt,320.37,137.03,2026-01-08,True
+SOLB-BLT-009,SOLBERG_ACCESSORIES,Reversible Belt,Belts,Canvas Belt,342.17,126.08,2025-07-21,True
+SOLB-BLT-010,SOLBERG_ACCESSORIES,Slim Leather Belt,Belts,Leather Belt,492.27,203.89,2025-02-23,True
+SOLB-SGL-011,SOLBERG_ACCESSORIES,Modern Rectangle,Sunglasses,Aviator,890.89,275.34,2023-11-08,True
+SOLB-SGL-012,SOLBERG_ACCESSORIES,Oversized Square,Sunglasses,Oversized,807.79,240.41,2025-06-20,True
+SOLB-SGL-013,SOLBERG_ACCESSORIES,Retro Round,Sunglasses,Aviator,209.74,83.86,2023-11-13,False
+SOLB-SGL-014,SOLBERG_ACCESSORIES,Sport Wrap,Sunglasses,Oversized,435.99,140.83,2023-06-14,True
+SOLB-SGL-015,SOLBERG_ACCESSORIES,Tortoise Round Frame,Sunglasses,Aviator,866.9,288.03,2025-09-26,True
+SOLB-SGL-016,SOLBERG_ACCESSORIES,Classic Aviator,Sunglasses,Classic,631.22,244.37,2024-08-11,True
+SOLB-SCH-017,SOLBERG_ACCESSORIES,Cotton Baseball Cap,Scarves & Hats,Scarf,117.4,38.81,2024-08-23,True
+SOLB-SCH-018,SOLBERG_ACCESSORIES,Reversible Scarf,Scarves & Hats,Bucket Hat,157.23,58.23,2026-03-05,True
+SOLB-SCH-019,SOLBERG_ACCESSORIES,Chunky Knit Scarf,Scarves & Hats,Beanie,166.99,73.17,2025-02-22,True
+SOLB-SCH-020,SOLBERG_ACCESSORIES,Dad Cap,Scarves & Hats,Beanie,298.07,108.06,2024-04-20,True
+SOLB-SCH-021,SOLBERG_ACCESSORIES,Ribbed Beanie,Scarves & Hats,Cap,365.74,115.27,2025-08-10,True
+SOLB-SCH-022,SOLBERG_ACCESSORIES,Merino Wool Scarf,Scarves & Hats,Beanie,128.54,39.62,2026-04-18,True
+SOLB-SCH-023,SOLBERG_ACCESSORIES,Bucket Hat,Scarves & Hats,Bucket Hat,375.13,143.1,2024-09-10,True
+SOLB-SCH-024,SOLBERG_ACCESSORIES,Classic Beanie,Scarves & Hats,Bucket Hat,440.33,191.1,2025-02-20,True
+SOLB-SOK-025,SOLBERG_ACCESSORIES,No-Show Socks 5-Pack,Socks,Thermal Socks,49.81,18.44,2023-04-11,True
+SOLB-SOK-026,SOLBERG_ACCESSORIES,Crew Socks 2-Pack,Socks,Thermal Socks,126.57,58.92,2024-12-22,True
+SOLB-SOK-027,SOLBERG_ACCESSORIES,Sport Ankle Socks,Socks,Crew Socks,111.09,44.25,2023-10-08,True
+SOLB-SOK-028,SOLBERG_ACCESSORIES,Ankle Socks 3-Pack,Socks,Ankle Socks,79.89,34.66,2026-04-01,True
+KIDS-KDS-001,KIDS_CO,Kids Puffer Jacket,Kidswear,Kids,537.23,283.03,2025-10-24,True
+KIDS-KDS-002,KIDS_CO,Baby Knitwear Set,Kidswear,Baby,227.49,98.97,2025-09-13,True
+KIDS-KDS-003,KIDS_CO,Kids Cotton T-Shirt,Kidswear,Toddler,472.28,251.37,2023-08-24,True
+KIDS-KDS-004,KIDS_CO,Toddler Zip-Up,Kidswear,Baby,529.07,240.81,2025-03-24,True
+KIDS-KDS-005,KIDS_CO,Kids Jogger Set,Kidswear,Kids,281.89,124.56,2023-01-29,True
+KIDS-KDS-006,KIDS_CO,Kids Denim Jeans,Kidswear,Toddler,435.41,202.7,2026-04-12,True
+KIDS-KDS-007,KIDS_CO,Baby Bodysuit Set,Kidswear,Kids,569.15,329.16,2024-04-23,True
+KIDS-KDS-008,KIDS_CO,Children's Raincoat,Kidswear,Kids,263.0,125.71,2023-05-10,True
+KIDS-KDS-009,KIDS_CO,Toddler Hoodie,Kidswear,Kids,250.1,129.64,2023-10-14,False
+KIDS-TSH-010,KIDS_CO,Classic Cotton Tee,T-Shirts,Relaxed Fit,216.47,92.32,2025-04-29,True
+KIDS-TSH-011,KIDS_CO,Essential Crew Neck,T-Shirts,Relaxed Fit,222.13,86.71,2024-07-26,True
+KIDS-TSH-012,KIDS_CO,Slim Fit T-Shirt,T-Shirts,Organic Cotton,142.45,67.58,2024-04-28,True
+KIDS-TSH-013,KIDS_CO,Premium Cotton Tee,T-Shirts,Organic Cotton,207.89,79.78,2025-01-04,True
+KIDS-TSH-014,KIDS_CO,Weekend Tee,T-Shirts,Organic Cotton,136.96,72.48,2025-07-20,True
+KIDS-TSH-015,KIDS_CO,Organic Soft Tee,T-Shirts,Premium Tee,227.34,101.96,2023-02-13,False
+KIDS-HOD-016,KIDS_CO,Oversized Fleece Hoodie,Hoodies,Zip Hoodie,793.32,346.33,2024-07-21,True
+KIDS-HOD-017,KIDS_CO,French Terry Hoodie,Hoodies,Zip Hoodie,892.76,396.72,2023-12-24,True
+KIDS-HOD-018,KIDS_CO,Classic Pullover Hoodie,Hoodies,Zip Hoodie,406.43,166.39,2024-05-02,True
+KIDS-HOD-019,KIDS_CO,Soft Terry Hoodie,Hoodies,Oversized Hoodie,425.2,176.95,2025-12-13,True
+KIDS-HOD-020,KIDS_CO,Lightweight Zip-Up,Hoodies,Pullover Hoodie,637.12,261.91,2025-11-17,True
+KIDS-JKT-021,KIDS_CO,Padded Winter Jacket,Jackets,Denim Jacket,2496.6,1199.72,2025-05-23,True
+KIDS-JKT-022,KIDS_CO,Oversized Blazer,Jackets,Windbreaker,2010.08,1128.23,2023-06-15,True
+KIDS-JKT-023,KIDS_CO,Lightweight Puffer,Jackets,Puffer Jacket,1266.53,662.88,2026-01-28,True
+KIDS-JKT-024,KIDS_CO,Tailored Blazer,Jackets,Windbreaker,2489.87,1354.21,2025-07-18,True
+KIDS-SOK-025,KIDS_CO,Sport Ankle Socks,Socks,Crew Socks,90.38,33.97,2025-03-27,True
+KIDS-SOK-026,KIDS_CO,Thermal Wool Socks,Socks,Ankle Socks,80.25,36.36,2024-06-06,True
+KIDS-SOK-027,KIDS_CO,No-Show Socks 5-Pack,Socks,Crew Socks,117.68,50.47,2023-07-06,True
+KIDS-SOK-028,KIDS_CO,Crew Socks 2-Pack,Socks,Ankle Socks,123.46,54.83,2023-09-24,True

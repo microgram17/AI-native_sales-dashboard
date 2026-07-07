@@ -1,12 +1,15 @@
-FROM python:3.13-slim
+FROM python:3.13-slim-bookworm
 
 WORKDIR /app
 
+# Copy the uv binary from the official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY pyproject.toml uv.lock* ./
+# Install dependencies first (better layer caching)
+COPY pyproject.toml uv.lock* README.md ./
 RUN uv sync --frozen || uv sync
 
+# Copy application source
 COPY app ./app
 COPY scripts ./scripts
 
