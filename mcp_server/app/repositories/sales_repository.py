@@ -64,11 +64,11 @@ class SalesRepository:
                 ON p.product_id = oi.product_id
             WHERE p.supplier_id = %(supplier_id)s
               AND o.order_status = 'completed'
-              AND (%(date_from)s IS NULL OR o.order_date >= %(date_from)s)
-              AND (%(date_to)s IS NULL OR o.order_date <= %(date_to)s)
+              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
               AND (
-                    %(product_ids)s IS NULL
-                    OR p.product_id = ANY(%(product_ids)s)
+                    %(product_ids)s::text[] IS NULL
+                    OR p.product_id = ANY(%(product_ids)s::text[])
               )
             GROUP BY
                 period,
@@ -111,8 +111,8 @@ class SalesRepository:
                 ON p.product_id = oi.product_id
             WHERE p.supplier_id = %(supplier_id)s
               AND o.order_status = 'completed'
-              AND (%(date_from)s IS NULL OR o.order_date >= %(date_from)s)
-              AND (%(date_to)s IS NULL OR o.order_date <= %(date_to)s);
+              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date);
         """
 
         return await self._fetch_all(
@@ -149,8 +149,8 @@ class SalesRepository:
                 ON p.product_id = oi.product_id
             WHERE p.supplier_id = %(supplier_id)s
               AND o.order_status = 'completed'
-              AND (%(date_from)s IS NULL OR o.order_date >= %(date_from)s)
-              AND (%(date_to)s IS NULL OR o.order_date <= %(date_to)s)
+              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
             GROUP BY
                 p.product_id,
                 p.product_name,
@@ -201,8 +201,8 @@ class SalesRepository:
                 ON st.store_id = o.store_id
             WHERE p.supplier_id = %(supplier_id)s
               AND o.order_status = 'completed'
-              AND (%(date_from)s IS NULL OR o.order_date >= %(date_from)s)
-              AND (%(date_to)s IS NULL OR o.order_date <= %(date_to)s)
+              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
             GROUP BY
                 group_id,
                 group_name
