@@ -19,8 +19,8 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
     async def get_sales_summary(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
+        date_from: str | None,
+        date_to: str | None,
     ) -> ToolResultPayload:
         raw = await mcp_call_tool(
             self._url,
@@ -36,10 +36,12 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
     async def get_product_timeseries(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
+        date_from: str | None,
+        date_to: str | None,
         metric: str,
         grain: str,
+        product_ids: list[str] | None = None,
+        limit_products: int = 5,
     ) -> ToolResultPayload:
         raw = await mcp_call_tool(
             self._url,
@@ -50,6 +52,8 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
                 "date_to": date_to,
                 "metric": metric,
                 "grain": grain,
+                "product_ids": product_ids,
+                "limit_products": limit_products,
             },
         )
         return ToolResultPayload.model_validate(raw)
@@ -57,9 +61,9 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
     async def get_top_products(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
-        metric: str,
+        date_from: str | None,
+        date_to: str | None,
+        sort_by: str,
         limit: int,
     ) -> ToolResultPayload:
         raw = await mcp_call_tool(
@@ -69,7 +73,7 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
                 "supplier_id": supplier_id,
                 "date_from": date_from,
                 "date_to": date_to,
-                "metric": metric,
+                "sort_by": sort_by,
                 "limit": limit,
             },
         )
@@ -78,8 +82,8 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
     async def get_store_breakdown(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
+        date_from: str | None,
+        date_to: str | None,
         metric: str,
         group_by: str,
     ) -> ToolResultPayload:
@@ -92,6 +96,23 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
                 "date_to": date_to,
                 "metric": metric,
                 "group_by": group_by,
+            },
+        )
+        return ToolResultPayload.model_validate(raw)
+
+    async def get_supplier_products(
+        self,
+        supplier_id: str,
+        date_from: str | None,
+        date_to: str | None,
+    ) -> ToolResultPayload:
+        raw = await mcp_call_tool(
+            self._url,
+            "get_current_supplier_products",
+            {
+                "supplier_id": supplier_id,
+                "date_from": date_from,
+                "date_to": date_to,
             },
         )
         return ToolResultPayload.model_validate(raw)

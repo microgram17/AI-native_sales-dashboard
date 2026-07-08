@@ -1,4 +1,17 @@
-export const COLORS = ['var(--accent)', '#94a3b8', '#64748b', '#e2a03f']
+export const COLORS = [
+  'var(--accent)',
+  '#94a3b8',
+  '#e2a03f',
+  '#64748b',
+  '#a78bfa',
+  '#34d399',
+  '#f87171',
+  '#60a5fa',
+  '#fbbf24',
+  '#4ade80',
+  '#c084fc',
+  '#fb923c',
+]
 
 export function formatShortNumber(v: unknown): string {
   if (typeof v !== 'number') return String(v ?? '')

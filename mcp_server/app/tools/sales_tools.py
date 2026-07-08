@@ -136,6 +136,55 @@ def build_top_products_result(
     )
 
 
+def build_top_products_multi_metric_result(
+    *,
+    rows: list[dict],
+    sort_by: SupplierSalesMetric,
+    limit: int,
+) -> ToolResult:
+    return ToolResult(
+        result_type="ranking",
+        title=f"Top {limit} products by {_metric_label(sort_by).lower()}",
+        columns=[
+            ColumnSpec(key="rank", label="Rank", type="integer"),
+            ColumnSpec(key="product_id", label="Product ID", type="string"),
+            ColumnSpec(key="product_name", label="Product", type="string"),
+            ColumnSpec(key="category", label="Category", type="string"),
+            ColumnSpec(key="net_sales", label="Net sales", type="currency", unit="SEK"),
+            ColumnSpec(key="gross_sales", label="Gross sales", type="currency", unit="SEK"),
+            ColumnSpec(key="units", label="Units sold", type="integer"),
+            ColumnSpec(key="orders", label="Orders", type="integer"),
+            ColumnSpec(key="discounts", label="Discounts", type="currency", unit="SEK"),
+        ],
+        rows=rows,
+        recommended_visualizations=[
+            VisualizationSpec(
+                type="bar_chart",
+                title=f"Top products by {_metric_label(sort_by).lower()}",
+                x_key="product_name",
+                y_keys=["net_sales"],
+            )
+        ],
+        data_quality=DataQuality(row_count=len(rows)),
+    )
+
+
+def build_products_result(*, rows: list[dict]) -> ToolResult:
+    return ToolResult(
+        result_type="table",
+        title="Product selector",
+        columns=[
+            ColumnSpec(key="product_id", label="Product ID", type="string"),
+            ColumnSpec(key="product_name", label="Product", type="string"),
+            ColumnSpec(key="category", label="Category", type="string"),
+            ColumnSpec(key="net_sales", label="Net sales", type="currency", unit="SEK"),
+            ColumnSpec(key="units", label="Units sold", type="integer"),
+        ],
+        rows=rows,
+        data_quality=DataQuality(row_count=len(rows)),
+    )
+
+
 def build_store_breakdown_result(
     *,
     rows: list[dict],
@@ -172,6 +221,7 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
         product_ids: list[str] | None = None,
         metric: Literal["net_sales", "gross_sales", "units", "discounts", "orders"] = "net_sales",
         grain: Literal["week", "month"] = "month",
+        limit_products: int = 5,
     ) -> dict:
         """
         Get product performance over time for the current supplier.
@@ -180,9 +230,12 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
         Do not ask the user for supplier_id.
         Do not infer supplier_id from user text.
         Use this for product trend questions over time.
+        When product_ids is omitted, returns the top limit_products products by metric.
         """
         if date_from and date_to and date_from > date_to:
             raise ValueError("date_from cannot be after date_to")
+        if not (1 <= limit_products <= 20):
+            raise ValueError("limit_products must be between 1 and 20")
 
         rows = await repo.fetch_supplier_product_timeseries(
             supplier_id=supplier_id,
@@ -191,6 +244,7 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
             product_ids=product_ids,
             metric=metric,
             grain=grain,
+            limit_products=limit_products,
         )
 
         result = build_product_timeseries_result(
@@ -228,16 +282,18 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
     @mcp.tool()
     async def get_current_supplier_top_products(
         supplier_id: str,
-        metric: Literal["net_sales", "gross_sales", "units", "discounts", "orders"] = "net_sales",
+        sort_by: Literal["net_sales", "gross_sales", "units", "discounts", "orders"] = "net_sales",
         limit: int = 10,
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> dict:
         """
-        Get top products for the current supplier.
+        Get top products for the current supplier with all key metrics.
 
         supplier_id must come from trusted server-side context.
         Use this for product rankings and best/worst performer questions.
+        Returns net_sales, gross_sales, units, orders, and discounts for each product.
+        Use sort_by to control which metric determines rank order.
         """
         if not (1 <= limit <= 50):
             raise ValueError("limit must be between 1 and 50")
@@ -245,20 +301,45 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
         if date_from and date_to and date_from > date_to:
             raise ValueError("date_from cannot be after date_to")
 
-        rows = await repo.fetch_supplier_top_products(
+        rows = await repo.fetch_supplier_top_products_multi_metric(
             supplier_id=supplier_id,
             date_from=date_from,
             date_to=date_to,
-            metric=metric,
+            sort_by=sort_by,
             limit=limit,
         )
 
-        result = build_top_products_result(
+        result = build_top_products_multi_metric_result(
             rows=rows,
-            metric=metric,
+            sort_by=sort_by,
             limit=limit,
         )
 
+        return result.model_dump(mode="json")
+
+    @mcp.tool()
+    async def get_current_supplier_products(
+        supplier_id: str,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> dict:
+        """
+        Get the product list for the current supplier, suitable for a product selector.
+
+        supplier_id must come from trusted server-side context.
+        Returns product_id, product_name, category, net_sales, and units.
+        Ordered by net_sales descending within the given date range.
+        """
+        if date_from and date_to and date_from > date_to:
+            raise ValueError("date_from cannot be after date_to")
+
+        rows = await repo.fetch_supplier_products(
+            supplier_id=supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+        result = build_products_result(rows=rows)
         return result.model_dump(mode="json")
 
     @mcp.tool()

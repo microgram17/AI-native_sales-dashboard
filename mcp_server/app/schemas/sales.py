@@ -27,10 +27,11 @@ class SupplierProductTimeseriesArgs(SupplierDateRange):
     metric: SupplierSalesMetric = "net_sales"
     grain: TimeGrain = "month"
     product_ids: list[str] | None = None
+    limit_products: int = Field(default=5, ge=1, le=20)
 
 
 class SupplierTopProductsArgs(SupplierDateRange):
-    metric: SupplierSalesMetric = "net_sales"
+    sort_by: SupplierSalesMetric = "net_sales"
     limit: int = Field(default=10, ge=1, le=50)
 
 
@@ -41,3 +42,7 @@ class SupplierSalesSummaryArgs(SupplierDateRange):
 class SupplierStoreBreakdownArgs(SupplierDateRange):
     metric: SupplierSalesMetric = "net_sales"
     group_by: Literal["store", "city", "channel"] = "store"
+
+
+class SupplierProductsArgs(SupplierDateRange):
+    pass

@@ -48,3 +48,66 @@ class DashboardResponse(BaseModel):
     user: UserInfo
     cards: list[KpiCard]
     artifacts: list[DashboardArtifact]
+
+
+# --- Widget-specific response models ---
+
+class SummaryResponse(BaseModel):
+    date_from: str | None
+    date_to: str | None
+    gross_sales: float
+    net_sales: float
+    discounts: float
+    units: int
+    orders: int
+
+
+class TimeseriesRow(BaseModel):
+    period: str
+    product_id: str
+    product_name: str
+    category: str
+    value: float
+
+
+class ProductTimeseriesResponse(BaseModel):
+    date_from: str | None
+    date_to: str | None
+    grain: str
+    metric: str
+    limit_products: int
+    rows: list[TimeseriesRow]
+
+
+class TopProductsRow(BaseModel):
+    rank: int
+    product_id: str
+    product_name: str
+    category: str
+    net_sales: float
+    gross_sales: float
+    units: int
+    orders: int
+    discounts: float
+
+
+class TopProductsResponse(BaseModel):
+    date_from: str | None
+    date_to: str | None
+    sort_by: str
+    limit: int
+    rows: list[TopProductsRow]
+
+
+class ProductSelectorItem(BaseModel):
+    product_id: str
+    product_name: str
+    category: str
+    net_sales: float
+    units: int
+
+
+class ProductsResponse(BaseModel):
+    date_from: str | None
+    date_to: str | None
+    products: list[ProductSelectorItem]

@@ -10,27 +10,29 @@ class SupplierAnalyticsPort(ABC):
     async def get_sales_summary(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
+        date_from: str | None,
+        date_to: str | None,
     ) -> ToolResultPayload: ...
 
     @abstractmethod
     async def get_product_timeseries(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
+        date_from: str | None,
+        date_to: str | None,
         metric: str,
         grain: str,
+        product_ids: list[str] | None = None,
+        limit_products: int = 5,
     ) -> ToolResultPayload: ...
 
     @abstractmethod
     async def get_top_products(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
-        metric: str,
+        date_from: str | None,
+        date_to: str | None,
+        sort_by: str,
         limit: int,
     ) -> ToolResultPayload: ...
 
@@ -38,8 +40,16 @@ class SupplierAnalyticsPort(ABC):
     async def get_store_breakdown(
         self,
         supplier_id: str,
-        date_from: str,
-        date_to: str,
+        date_from: str | None,
+        date_to: str | None,
         metric: str,
         group_by: str,
+    ) -> ToolResultPayload: ...
+
+    @abstractmethod
+    async def get_supplier_products(
+        self,
+        supplier_id: str,
+        date_from: str | None,
+        date_to: str | None,
     ) -> ToolResultPayload: ...

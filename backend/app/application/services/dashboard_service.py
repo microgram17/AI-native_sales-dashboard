@@ -3,16 +3,29 @@ from __future__ import annotations
 import asyncio
 
 from app.application.ports.supplier_analytics_port import SupplierAnalyticsPort
-from app.domain.dashboard import DashboardArtifact, DashboardResponse, KpiCard, UserInfo
+from app.domain.dashboard import (
+    DashboardArtifact,
+    DashboardResponse,
+    KpiCard,
+    ProductSelectorItem,
+    ProductTimeseriesResponse,
+    ProductsResponse,
+    SummaryResponse,
+    TimeseriesRow,
+    TopProductsResponse,
+    TopProductsRow,
+    UserInfo,
+)
 from app.domain.tool_result import ToolResultPayload
 from app.domain.user_context import UserContext
 
 # --- Dashboard filter defaults ---
-_DATE_FROM = "2024-01-01"
+_DATE_FROM = "2025-07-01"
 _DATE_TO = "2026-06-30"
 _METRIC = "net_sales"
 _GRAIN = "month"
 _TOP_LIMIT = 10
+_LIMIT_PRODUCTS = 5
 _STORE_GROUP_BY = "store"
 
 # Keys to surface as KPI cards (order preserved in response)
@@ -52,7 +65,9 @@ class DashboardService:
 
         summary, timeseries, top_products, store_breakdown = await asyncio.gather(
             self._port.get_sales_summary(sid, _DATE_FROM, _DATE_TO),
-            self._port.get_product_timeseries(sid, _DATE_FROM, _DATE_TO, _METRIC, _GRAIN),
+            self._port.get_product_timeseries(
+                sid, _DATE_FROM, _DATE_TO, _METRIC, _GRAIN, limit_products=_LIMIT_PRODUCTS
+            ),
             self._port.get_top_products(sid, _DATE_FROM, _DATE_TO, _METRIC, _TOP_LIMIT),
             self._port.get_store_breakdown(sid, _DATE_FROM, _DATE_TO, _METRIC, _STORE_GROUP_BY),
         )
@@ -74,4 +89,124 @@ class DashboardService:
             ),
             cards=cards,
             artifacts=artifacts,
+        )
+
+    async def get_summary(
+        self,
+        user: UserContext,
+        date_from: str | None,
+        date_to: str | None,
+    ) -> SummaryResponse:
+        payload = await self._port.get_sales_summary(user.supplier_id, date_from, date_to)
+        row = payload.rows[0] if payload.rows else {}
+        return SummaryResponse(
+            date_from=date_from,
+            date_to=date_to,
+            gross_sales=float(row.get("gross_sales") or 0),
+            net_sales=float(row.get("net_sales") or 0),
+            discounts=float(row.get("discounts") or 0),
+            units=int(row.get("units") or 0),
+            orders=int(row.get("orders") or 0),
+        )
+
+    async def get_product_timeseries_widget(
+        self,
+        user: UserContext,
+        date_from: str | None,
+        date_to: str | None,
+        grain: str,
+        metric: str,
+        product_ids: list[str] | None,
+        limit_products: int,
+    ) -> ProductTimeseriesResponse:
+        payload = await self._port.get_product_timeseries(
+            supplier_id=user.supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            metric=metric,
+            grain=grain,
+            product_ids=product_ids,
+            limit_products=limit_products,
+        )
+        rows = [
+            TimeseriesRow(
+                period=str(r["period"]),
+                product_id=str(r["product_id"]),
+                product_name=str(r["product_name"]),
+                category=str(r["category"]),
+                value=float(r.get("value") or 0),
+            )
+            for r in payload.rows
+        ]
+        return ProductTimeseriesResponse(
+            date_from=date_from,
+            date_to=date_to,
+            grain=grain,
+            metric=metric,
+            limit_products=limit_products,
+            rows=rows,
+        )
+
+    async def get_top_products_widget(
+        self,
+        user: UserContext,
+        date_from: str | None,
+        date_to: str | None,
+        sort_by: str,
+        limit: int,
+    ) -> TopProductsResponse:
+        payload = await self._port.get_top_products(
+            supplier_id=user.supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            limit=limit,
+        )
+        rows = [
+            TopProductsRow(
+                rank=int(r.get("rank") or 0),
+                product_id=str(r["product_id"]),
+                product_name=str(r["product_name"]),
+                category=str(r["category"]),
+                net_sales=float(r.get("net_sales") or 0),
+                gross_sales=float(r.get("gross_sales") or 0),
+                units=int(r.get("units") or 0),
+                orders=int(r.get("orders") or 0),
+                discounts=float(r.get("discounts") or 0),
+            )
+            for r in payload.rows
+        ]
+        return TopProductsResponse(
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            limit=limit,
+            rows=rows,
+        )
+
+    async def get_supplier_products_widget(
+        self,
+        user: UserContext,
+        date_from: str | None,
+        date_to: str | None,
+    ) -> ProductsResponse:
+        payload = await self._port.get_supplier_products(
+            supplier_id=user.supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        products = [
+            ProductSelectorItem(
+                product_id=str(r["product_id"]),
+                product_name=str(r["product_name"]),
+                category=str(r["category"]),
+                net_sales=float(r.get("net_sales") or 0),
+                units=int(r.get("units") or 0),
+            )
+            for r in payload.rows
+        ]
+        return ProductsResponse(
+            date_from=date_from,
+            date_to=date_to,
+            products=products,
         )

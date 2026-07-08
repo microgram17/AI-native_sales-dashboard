@@ -46,49 +46,88 @@ class SalesRepository:
         grain: TimeGrain,
         metric: SupplierSalesMetric,
         product_ids: list[str] | None = None,
+        limit_products: int = 5,
     ) -> list[dict]:
         metric_sql = _METRIC_SQL[metric]
         grain_sql = _GRAIN_SQL[grain]
 
-        query = f"""
-            SELECT
-                {grain_sql} AS period,
-                p.product_id,
-                p.product_name,
-                p.category,
-                ROUND(({metric_sql})::numeric, 2) AS value
-            FROM order_items oi
-            JOIN orders o
-                ON o.order_id = oi.order_id
-            JOIN products p
-                ON p.product_id = oi.product_id
-            WHERE p.supplier_id = %(supplier_id)s
-              AND o.order_status = 'completed'
-              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
-              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
-              AND (
-                    %(product_ids)s::text[] IS NULL
-                    OR p.product_id = ANY(%(product_ids)s::text[])
-              )
-            GROUP BY
-                period,
-                p.product_id,
-                p.product_name,
-                p.category
-            ORDER BY
-                period ASC,
-                p.product_name ASC;
-        """
-
-        return await self._fetch_all(
-            query,
-            {
-                "supplier_id": supplier_id,
-                "date_from": date_from,
-                "date_to": date_to,
-                "product_ids": product_ids,
-            },
-        )
+        if product_ids is not None:
+            # Explicit product filter — limit_products is ignored
+            query = f"""
+                SELECT
+                    {grain_sql} AS period,
+                    p.product_id,
+                    p.product_name,
+                    p.category,
+                    ROUND(({metric_sql})::numeric, 2) AS value
+                FROM order_items oi
+                JOIN orders o
+                    ON o.order_id = oi.order_id
+                JOIN products p
+                    ON p.product_id = oi.product_id
+                WHERE p.supplier_id = %(supplier_id)s
+                  AND o.order_status = 'completed'
+                  AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+                  AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
+                  AND p.product_id = ANY(%(product_ids)s::text[])
+                GROUP BY period, p.product_id, p.product_name, p.category
+                ORDER BY period ASC, p.product_name ASC;
+            """
+            return await self._fetch_all(
+                query,
+                {
+                    "supplier_id": supplier_id,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "product_ids": product_ids,
+                },
+            )
+        else:
+            # No explicit products — CTE identifies top N products by metric first
+            query = f"""
+                WITH top_products AS (
+                    SELECT p.product_id
+                    FROM order_items oi
+                    JOIN orders o
+                        ON o.order_id = oi.order_id
+                    JOIN products p
+                        ON p.product_id = oi.product_id
+                    WHERE p.supplier_id = %(supplier_id)s
+                      AND o.order_status = 'completed'
+                      AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+                      AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
+                    GROUP BY p.product_id
+                    ORDER BY {metric_sql} DESC
+                    LIMIT %(limit_products)s
+                )
+                SELECT
+                    {grain_sql} AS period,
+                    p.product_id,
+                    p.product_name,
+                    p.category,
+                    ROUND(({metric_sql})::numeric, 2) AS value
+                FROM order_items oi
+                JOIN orders o
+                    ON o.order_id = oi.order_id
+                JOIN products p
+                    ON p.product_id = oi.product_id
+                WHERE p.supplier_id = %(supplier_id)s
+                  AND o.order_status = 'completed'
+                  AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+                  AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
+                  AND p.product_id IN (SELECT product_id FROM top_products)
+                GROUP BY period, p.product_id, p.product_name, p.category
+                ORDER BY period ASC, p.product_name ASC;
+            """
+            return await self._fetch_all(
+                query,
+                {
+                    "supplier_id": supplier_id,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "limit_products": limit_products,
+                },
+            )
 
     async def fetch_supplier_sales_summary(
         self,
@@ -167,6 +206,96 @@ class SalesRepository:
                 "date_from": date_from,
                 "date_to": date_to,
                 "limit": limit,
+            },
+        )
+
+    async def fetch_supplier_top_products_multi_metric(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        sort_by: SupplierSalesMetric,
+        limit: int,
+    ) -> list[dict]:
+        sort_by_sql = _METRIC_SQL[sort_by]
+
+        query = f"""
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY {sort_by_sql} DESC) AS rank,
+                p.product_id,
+                p.product_name,
+                p.category,
+                ROUND((SUM(oi.quantity * oi.unit_price_sek - oi.discount_amount_sek))::numeric, 2) AS net_sales,
+                ROUND((SUM(oi.quantity * oi.unit_price_sek))::numeric, 2) AS gross_sales,
+                SUM(oi.quantity) AS units,
+                COUNT(DISTINCT o.order_id) AS orders,
+                ROUND((SUM(oi.discount_amount_sek))::numeric, 2) AS discounts
+            FROM order_items oi
+            JOIN orders o
+                ON o.order_id = oi.order_id
+            JOIN products p
+                ON p.product_id = oi.product_id
+            WHERE p.supplier_id = %(supplier_id)s
+              AND o.order_status = 'completed'
+              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
+            GROUP BY
+                p.product_id,
+                p.product_name,
+                p.category
+            ORDER BY
+                {sort_by_sql} DESC
+            LIMIT %(limit)s;
+        """
+
+        return await self._fetch_all(
+            query,
+            {
+                "supplier_id": supplier_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": limit,
+            },
+        )
+
+    async def fetch_supplier_products(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> list[dict]:
+        query = """
+            SELECT
+                p.product_id,
+                p.product_name,
+                p.category,
+                ROUND((SUM(oi.quantity * oi.unit_price_sek - oi.discount_amount_sek))::numeric, 2) AS net_sales,
+                SUM(oi.quantity) AS units
+            FROM order_items oi
+            JOIN orders o
+                ON o.order_id = oi.order_id
+            JOIN products p
+                ON p.product_id = oi.product_id
+            WHERE p.supplier_id = %(supplier_id)s
+              AND o.order_status = 'completed'
+              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
+            GROUP BY
+                p.product_id,
+                p.product_name,
+                p.category
+            ORDER BY
+                net_sales DESC;
+        """
+
+        return await self._fetch_all(
+            query,
+            {
+                "supplier_id": supplier_id,
+                "date_from": date_from,
+                "date_to": date_to,
             },
         )
 
