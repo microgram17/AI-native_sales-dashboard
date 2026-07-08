@@ -1,22 +1,42 @@
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
-from app.api import agent, dashboard, health, tenancy
+from app.adapters.inbound.api.dashboard_routes import router as dashboard_router
+from app.core.config import get_settings
 
-load_dotenv()
 
-app = FastAPI(title="Retail BI Backend")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    yield
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-app.include_router(health.router, prefix="/api")
-app.include_router(tenancy.router, prefix="/api")
-app.include_router(dashboard.router, prefix="/api/dashboard")
-app.include_router(agent.router, prefix="/api/agent")
+def create_app() -> FastAPI:
+    settings = get_settings()
+
+    app = FastAPI(
+        title="Supplier BI Backend",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(dashboard_router)
+
+    @app.get("/health")
+    async def health() -> dict:
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()

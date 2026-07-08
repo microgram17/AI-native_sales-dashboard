@@ -1,5 +1,3 @@
-import type { ChartValueType } from '../../../types/agent'
-
 export const COLORS = ['var(--accent)', '#94a3b8', '#64748b', '#e2a03f']
 
 export function formatShortNumber(v: unknown): string {
@@ -12,28 +10,6 @@ export function formatShortNumber(v: unknown): string {
 export function formatTooltipValue(v: unknown): string {
   if (typeof v !== 'number') return String(v ?? '')
   return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(v)
-}
-
-export function formatCellValue(v: unknown, type?: ChartValueType): string {
-  if (v === null || v === undefined) return ''
-  if (type === 'currency') {
-    if (typeof v !== 'number') return String(v)
-    return new Intl.NumberFormat('sv-SE', {
-      style: 'currency',
-      currency: 'SEK',
-      maximumFractionDigits: 0,
-    }).format(v)
-  }
-  if (type === 'percent') {
-    if (typeof v === 'string' && v.includes('%')) return v
-    if (typeof v !== 'number') return String(v)
-    return `${new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 1 }).format(v)}%`
-  }
-  if (type === 'number') {
-    if (typeof v !== 'number') return String(v)
-    return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 2 }).format(v)
-  }
-  return String(v)
 }
 
 /**

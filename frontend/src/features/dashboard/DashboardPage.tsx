@@ -1,153 +1,107 @@
-import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { dashboardApi } from '../../api/dashboard'
-import { setDemoUser } from '../../api/client'
+import type { KpiCardData, DashboardArtifact } from '../../types/dashboard'
 import { KpiCard } from './components/KpiCard'
-import { SupplierSelector } from './components/SupplierSelector'
-import { UserSelector } from './components/UserSelector'
-import { RevenueTrendChart } from './components/RevenueTrendChart'
+import { ProductTimeseriesChart } from './components/ProductTimeseriesChart'
 import { TopProductsTable } from './components/TopProductsTable'
-import { AgentChat } from './components/AgentChat'
+import { StoreBreakdownChart } from './components/StoreBreakdownChart'
 
-const DEFAULT_SUPPLIER = 'SUP-001'
+function findArtifact(
+  artifacts: DashboardArtifact[],
+  sourceTool: string,
+): DashboardArtifact | undefined {
+  return artifacts.find((a) => a.source_tool === sourceTool)
+}
 
-const fmtCurrency = (n: number) =>
-  new Intl.NumberFormat('sv-SE', {
-    style: 'currency',
-    currency: 'SEK',
-    maximumFractionDigits: 0,
-  }).format(n)
+function formatCardValue(value: number, unit: string | null): string {
+  if (unit === 'SEK') {
+    return new Intl.NumberFormat('sv-SE', {
+      style: 'currency',
+      currency: 'SEK',
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
+  return value.toLocaleString('sv-SE', { maximumFractionDigits: 0 })
+}
 
 export function DashboardPage() {
-  const [selectedUser, setSelectedUser] = useState('')
-  const [supplierCode, setSupplierCode] = useState(DEFAULT_SUPPLIER)
-
-  const { data: demoUsersData } = useQuery({
-    queryKey: ['demoUsers'],
-    queryFn: () => dashboardApi.listDemoUsers(),
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: dashboardApi.getDashboard,
   })
 
-  // Set the first demo user once data loads
-  useEffect(() => {
-    if (demoUsersData?.users.length && !selectedUser) {
-      const first = demoUsersData.users[0]
-      setSelectedUser(first.user_id)
-      setDemoUser(first.user_id)
-      if (first.supplier_codes.length) {
-        setSupplierCode(first.supplier_codes[0])
-      }
-    }
-  }, [demoUsersData, selectedUser])
-
-  function handleUserChange(userId: string) {
-    const user = demoUsersData?.users.find((u) => u.user_id === userId)
-    setSelectedUser(userId)
-    setDemoUser(userId)
-    if (user?.supplier_codes.length) {
-      setSupplierCode(user.supplier_codes[0])
-    }
+  if (isLoading) {
+    return (
+      <div className="dashboard">
+        <div className="panel" style={{ textAlign: 'center', padding: '2rem' }}>
+          Loading dashboard…
+        </div>
+      </div>
+    )
   }
 
-  const { data: suppliersData } = useQuery({
-    queryKey: ['suppliers', selectedUser],
-    queryFn: () => dashboardApi.listSuppliers(),
-    enabled: !!selectedUser,
-  })
+  if (isError || !data) {
+    return (
+      <div className="dashboard">
+        <div className="panel" style={{ textAlign: 'center', padding: '2rem', color: 'var(--danger, #ef4444)' }}>
+          Failed to load dashboard data.
+        </div>
+      </div>
+    )
+  }
 
-  const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['summary', supplierCode],
-    queryFn: () => dashboardApi.getSupplierSummary(supplierCode),
-  })
-
-  const { data: trend, isLoading: trendLoading } = useQuery({
-    queryKey: ['trend', supplierCode],
-    queryFn: () => dashboardApi.getRevenueTrend(supplierCode),
-  })
-
-  const { data: topProducts, isLoading: productsLoading } = useQuery({
-    queryKey: ['topProducts', supplierCode],
-    queryFn: () => dashboardApi.getTopProducts(supplierCode),
-  })
-
-  const suppliers = suppliersData?.suppliers ?? []
+  const timeseries = findArtifact(data.artifacts, 'get_current_supplier_product_timeseries')
+  const topProducts = findArtifact(data.artifacts, 'get_current_supplier_top_products')
+  const storeBreakdown = findArtifact(data.artifacts, 'get_current_supplier_store_breakdown')
 
   return (
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="dashboard-title">
-            <h1>Supplier Dashboard</h1>
-            {summary?.supplier_name && (
-              <span className="supplier-tagline">{summary.supplier_name}</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <UserSelector
-              users={demoUsersData?.users ?? []}
-              selected={selectedUser}
-              onChange={handleUserChange}
-            />
-            <SupplierSelector
-              suppliers={suppliers}
-              selected={supplierCode}
-              onChange={setSupplierCode}
-            />
-          </div>
+          <h1>Supplier Dashboard</h1>
+          <span className="supplier-tagline">{data.user.supplier_id}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>
+            {data.user.display_name}
+          </span>
+        </div>
       </header>
 
       <section className="kpi-grid">
-        <KpiCard
-          label="Total Revenue"
-          value={summary ? fmtCurrency(summary.total_revenue) : '—'}
-          loading={summaryLoading}
-        />
-        <KpiCard
-          label="Estimated Margin"
-          value={summary ? fmtCurrency(summary.estimated_margin) : '—'}
-          loading={summaryLoading}
-        />
-        <KpiCard
-          label="Total Orders"
-          value={summary ? summary.total_orders.toLocaleString() : '—'}
-          loading={summaryLoading}
-        />
-        <KpiCard
-          label="Avg Order Value"
-          value={summary ? fmtCurrency(summary.average_order_value) : '—'}
-          loading={summaryLoading}
-        />
-        <KpiCard
-          label="Market Share"
-          value={
-            summary?.latest_market_share
-              ? `${summary.latest_market_share.estimated_market_share_pct}%`
-              : '—'
-          }
-          sub={summary?.latest_market_share?.period}
-          loading={summaryLoading}
-        />
+        {data.cards.map((card: KpiCardData) => (
+          <KpiCard
+            key={card.key}
+            label={card.label}
+            value={formatCardValue(card.value, card.unit)}
+          />
+        ))}
       </section>
 
       <div className="dashboard-grid">
         <section className="panel">
-          <h2>Revenue Trend</h2>
-          <RevenueTrendChart
-            data={trend?.points ?? []}
-            loading={trendLoading}
+          <h2>Product Revenue Trend</h2>
+          <ProductTimeseriesChart
+            rows={timeseries?.rows ?? []}
+            loading={false}
           />
         </section>
 
         <section className="panel">
           <h2>Top Products</h2>
           <TopProductsTable
-            products={topProducts?.products ?? []}
-            loading={productsLoading}
+            rows={topProducts?.rows ?? []}
+            loading={false}
           />
         </section>
       </div>
 
       <section className="panel">
-        <h2>Ask the Agent</h2>
-        <AgentChat supplierCode={supplierCode} />
+        <h2>Store Breakdown</h2>
+        <StoreBreakdownChart
+          rows={storeBreakdown?.rows ?? []}
+          loading={false}
+        />
       </section>
     </div>
   )
