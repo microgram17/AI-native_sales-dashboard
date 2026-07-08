@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { agentApi } from '../../../api/agent'
-import type { ChatMessage } from '../../../types/agent'
-import { VisualizationChart } from './VisualizationChart'
+import type { AgentArtifact, ChatMessage } from '../../../types/agent'
+import { legacyVisualizationToArtifact } from './legacyVisualizationAdapter'
+import { ArtifactRenderer } from './ArtifactRenderer'
 
 interface AgentChatProps {
   supplierCode: string
@@ -27,13 +28,18 @@ export function AgentChat({ supplierCode }: AgentChatProps) {
     mutationFn: (question: string) =>
       agentApi.ask({ supplier_code: supplierCode, question }),
     onSuccess: (data) => {
+      let artifacts: AgentArtifact[] = data.artifacts ?? []
+      if (artifacts.length === 0 && data.visualization) {
+        const adapted = legacyVisualizationToArtifact(data.visualization)
+        if (adapted) artifacts = [adapted]
+      }
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: 'assistant',
           content: data.answer,
-          visualization: data.visualization,
+          artifacts,
         },
       ])
     },
@@ -76,13 +82,12 @@ export function AgentChat({ supplierCode }: AgentChatProps) {
             <div className={`message-bubble${msg.isError ? ' message-error' : ''}`}>
               {msg.content}
               {msg.role === 'assistant' &&
-                msg.visualization &&
-                msg.visualization.type !== 'none' &&
-                msg.visualization.type !== 'unsupported' &&
-                msg.visualization.data &&
-                msg.visualization.data.length > 0 && (
-                  <div className="message-viz">
-                    <VisualizationChart viz={msg.visualization} />
+                msg.artifacts &&
+                msg.artifacts.length > 0 && (
+                  <div className="message-artifacts">
+                    {msg.artifacts.map((artifact, i) => (
+                      <ArtifactRenderer key={artifact.id ?? i} artifact={artifact} />
+                    ))}
                   </div>
                 )}
             </div>

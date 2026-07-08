@@ -1,3 +1,9 @@
+"""Apply schema.sql to the database.
+
+Usage:
+    uv run python -m scripts.apply_schema
+"""
+
 from pathlib import Path
 
 from app.db.connection import get_connection
@@ -14,7 +20,7 @@ def main() -> None:
         with conn.cursor() as cur:
             cur.execute(schema_sql)
 
-    print("Database schema applied.")
+    print(f"Schema applied from {SCHEMA_PATH.relative_to(MCP_SERVER_ROOT)}")
 
 
 if __name__ == "__main__":

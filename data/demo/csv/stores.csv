@@ -1,0 +1,11 @@
+store_id,store_name,store_type,city,opened_date,active
+ONLINE-SE,Online Store,online,Online,2018-03-01,True
+STO-001,Stockholm City,physical,Stockholm,2019-09-15,True
+STO-002,Stockholm Mall,physical,Stockholm,2020-04-01,True
+STO-003,Stockholm Outlet,physical,Stockholm,2021-06-01,True
+UPP-001,Uppsala City,physical,Uppsala,2019-03-10,True
+UPP-002,Uppsala Mall,physical,Uppsala,2020-11-01,True
+UPP-003,Uppsala Outlet,physical,Uppsala,2022-03-01,True
+GOT-001,Göteborg City,physical,Göteborg,2019-06-01,True
+GOT-002,Göteborg Mall,physical,Göteborg,2020-08-15,True
+GOT-003,Göteborg Outlet,physical,Göteborg,2021-09-01,True
