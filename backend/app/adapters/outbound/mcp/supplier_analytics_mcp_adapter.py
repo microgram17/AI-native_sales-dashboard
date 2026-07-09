@@ -116,3 +116,70 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
             },
         )
         return ToolResultPayload.model_validate(raw)
+
+    async def get_ranked_products(
+        self,
+        supplier_id: str,
+        date_from: str | None,
+        date_to: str | None,
+        metric: str,
+        limit: int,
+        city: str | None = None,
+        store_id: str | None = None,
+        channel: str | None = None,
+        category: str | None = None,
+    ) -> ToolResultPayload:
+        raw = await mcp_call_tool(
+            self._url,
+            "get_current_supplier_ranked_products",
+            {
+                "supplier_id": supplier_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "metric": metric,
+                "limit": limit,
+                "city": city,
+                "store_id": store_id,
+                "channel": channel,
+                "category": category,
+            },
+        )
+        return ToolResultPayload.model_validate(raw)
+
+    async def get_ranked_locations(
+        self,
+        supplier_id: str,
+        date_from: str | None,
+        date_to: str | None,
+        metric: str,
+        group_by: str,
+        limit: int,
+        category: str | None = None,
+        product_id: str | None = None,
+    ) -> ToolResultPayload:
+        raw = await mcp_call_tool(
+            self._url,
+            "get_current_supplier_ranked_locations",
+            {
+                "supplier_id": supplier_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "metric": metric,
+                "group_by": group_by,
+                "limit": limit,
+                "category": category,
+                "product_id": product_id,
+            },
+        )
+        return ToolResultPayload.model_validate(raw)
+
+    async def get_filter_values(
+        self,
+        supplier_id: str,
+    ) -> ToolResultPayload:
+        raw = await mcp_call_tool(
+            self._url,
+            "get_current_supplier_filter_values",
+            {"supplier_id": supplier_id},
+        )
+        return ToolResultPayload.model_validate(raw)

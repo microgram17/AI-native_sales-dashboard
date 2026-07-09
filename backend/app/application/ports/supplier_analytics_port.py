@@ -53,3 +53,36 @@ class SupplierAnalyticsPort(ABC):
         date_from: str | None,
         date_to: str | None,
     ) -> ToolResultPayload: ...
+
+    @abstractmethod
+    async def get_ranked_products(
+        self,
+        supplier_id: str,
+        date_from: str | None,
+        date_to: str | None,
+        metric: str,
+        limit: int,
+        city: str | None = None,
+        store_id: str | None = None,
+        channel: str | None = None,
+        category: str | None = None,
+    ) -> ToolResultPayload: ...
+
+    @abstractmethod
+    async def get_ranked_locations(
+        self,
+        supplier_id: str,
+        date_from: str | None,
+        date_to: str | None,
+        metric: str,
+        group_by: str,
+        limit: int,
+        category: str | None = None,
+        product_id: str | None = None,
+    ) -> ToolResultPayload: ...
+
+    @abstractmethod
+    async def get_filter_values(
+        self,
+        supplier_id: str,
+    ) -> ToolResultPayload: ...

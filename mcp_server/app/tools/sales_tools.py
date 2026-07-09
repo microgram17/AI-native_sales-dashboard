@@ -183,6 +183,126 @@ def build_store_breakdown_result(
     )
 
 
+def _metric_named_column(metric: SupplierSalesMetric) -> ColumnSpec:
+    """Return a ColumnSpec with key=metric (used in ranked results where the column IS the metric)."""
+    return ColumnSpec(
+        key=metric,
+        label=_metric_label(metric),
+        type=_metric_column_type(metric),
+        unit=_metric_unit(metric),
+    )
+
+
+def build_ranked_products_result(
+    *,
+    rows: list[dict],
+    metric: SupplierSalesMetric,
+    limit: int,
+    applied_filters: dict,
+) -> ToolResult:
+    """Result builder for get_current_supplier_ranked_products.
+
+    Avoids a single-bar chart when limit=1 (single winner).
+    """
+    result_intent = "single_winner" if limit == 1 else "ranking"
+    title_prefix = "Best product" if limit == 1 else f"Top {limit} products"
+    title = f"{title_prefix} by {_metric_label(metric).lower()}"
+
+    vizs: list[VisualizationSpec] = []
+    if limit > 1:
+        vizs.append(
+            VisualizationSpec(
+                type="bar_chart",
+                title=title,
+                x_key="product_name",
+                y_keys=[metric],
+            )
+        )
+
+    return ToolResult(
+        result_type="ranking",
+        title=title,
+        columns=[
+            ColumnSpec(key="rank", label="Rank", type="integer"),
+            ColumnSpec(key="product_id", label="Product ID", type="string"),
+            ColumnSpec(key="product_name", label="Product", type="string"),
+            ColumnSpec(key="category", label="Category", type="string"),
+            _metric_named_column(metric),
+        ],
+        rows=rows,
+        recommended_visualizations=vizs,
+        data_quality=DataQuality(row_count=len(rows)),
+        applied_filters=applied_filters,
+        primary_metric=metric,
+        dimension="product",
+        result_intent=result_intent,
+    )
+
+
+def build_ranked_locations_result(
+    *,
+    rows: list[dict],
+    metric: SupplierSalesMetric,
+    group_by: str,
+    limit: int,
+    applied_filters: dict,
+) -> ToolResult:
+    """Result builder for get_current_supplier_ranked_locations."""
+    result_intent = "single_winner" if limit == 1 else "ranking"
+    dim_label = {"store": "store", "city": "city", "channel": "channel"}[group_by]
+    title_prefix = f"Best {dim_label}" if limit == 1 else f"Top {limit} {dim_label}s"
+    title = f"{title_prefix} by {_metric_label(metric).lower()}"
+
+    vizs: list[VisualizationSpec] = []
+    if limit > 1:
+        vizs.append(
+            VisualizationSpec(
+                type="bar_chart",
+                title=title,
+                x_key="group_name",
+                y_keys=[metric],
+            )
+        )
+
+    return ToolResult(
+        result_type="ranking",
+        title=title,
+        columns=[
+            ColumnSpec(key="rank", label="Rank", type="integer"),
+            ColumnSpec(key="group_id", label="Group ID", type="string"),
+            ColumnSpec(key="group_name", label=dim_label.capitalize(), type="string"),
+            _metric_named_column(metric),
+        ],
+        rows=rows,
+        recommended_visualizations=vizs,
+        data_quality=DataQuality(row_count=len(rows)),
+        applied_filters=applied_filters,
+        primary_metric=metric,
+        dimension=group_by,
+        result_intent=result_intent,
+    )
+
+
+def build_filter_values_result(*, filter_data: dict) -> ToolResult:
+    """Result builder for get_current_supplier_filter_values."""
+    rows = (
+        [{"filter_type": "city", "value": v} for v in filter_data.get("cities", [])]
+        + [{"filter_type": "channel", "value": v} for v in filter_data.get("channels", [])]
+        + [{"filter_type": "category", "value": v} for v in filter_data.get("categories", [])]
+    )
+    return ToolResult(
+        result_type="table",
+        title="Available filter values",
+        description="Distinct cities, channels, and categories with sales data for this supplier.",
+        columns=[
+            ColumnSpec(key="filter_type", label="Filter type", type="string"),
+            ColumnSpec(key="value", label="Value", type="string"),
+        ],
+        rows=rows,
+        data_quality=DataQuality(row_count=len(rows)),
+    )
+
+
 def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
     @mcp.tool()
     async def get_current_supplier_product_timeseries(
@@ -344,4 +464,174 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
             group_by=group_by,
         )
 
+        return result.model_dump(mode="json")
+
+    @mcp.tool()
+    async def get_current_supplier_ranked_products(
+        supplier_id: str,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        metric: Literal["net_sales", "gross_sales", "units", "discounts", "orders"] = "net_sales",
+        limit: int = 10,
+        city: str | None = None,
+        store_id: str | None = None,
+        channel: Literal["online", "physical"] | None = None,
+        category: str | None = None,
+    ) -> dict:
+        """
+        Rank products by a selected retail sell-through metric with optional dimension filters.
+
+        supplier_id must come from trusted server-side context.
+
+        Use this tool when the user asks about best-selling or top-performing products
+        AND the question includes a location or dimension filter, OR when the agent needs
+        a single winner rather than an unfiltered top-N list.
+
+        When to prefer this tool over get_current_supplier_top_products:
+        - 'what product sells the best in Stockholm?' → city='Stockholm', metric='units', limit=1
+        - 'top 8 products by units sold in Stockholm' → city='Stockholm', metric='units', limit=8
+        - 'highest revenue products online' → channel='online', metric='net_sales'
+        - 'best-selling hoodies in Q1' → category='Hoodies', metric='units', date_from/date_to set
+        - 'top products by units in December' → metric='units', date range set
+
+        metric selection:
+        - metric='units'      → best-selling / most popular / volume / quantity sold (use for 'sells the best')
+        - metric='net_sales'  → highest retail sales value / revenue (DEFAULT)
+        - metric='orders'     → products appearing in the most orders
+        - metric='discounts'  → most discounted products
+        - metric='gross_sales' → only when user explicitly says gross sales
+
+        limit: number of products to return (1-50). Use limit=1 for single-winner questions.
+
+        Note: online stores have city='Online'. Use channel='online' for online-only filter.
+        """
+        if not (1 <= limit <= 50):
+            raise ValueError("limit must be between 1 and 50")
+        if date_from and date_to and date_from > date_to:
+            raise ValueError("date_from cannot be after date_to")
+
+        rows = await repo.fetch_supplier_ranked_products(
+            supplier_id=supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            metric=metric,
+            limit=limit,
+            city=city,
+            store_id=store_id,
+            channel=channel,
+            category=category,
+        )
+
+        applied_filters = {
+            k: v for k, v in {
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+                "metric": metric,
+                "limit": limit,
+                "city": city,
+                "store_id": store_id,
+                "channel": channel,
+                "category": category,
+            }.items() if v is not None
+        }
+
+        result = build_ranked_products_result(
+            rows=rows,
+            metric=metric,
+            limit=limit,
+            applied_filters=applied_filters,
+        )
+
+        return result.model_dump(mode="json")
+
+    @mcp.tool()
+    async def get_current_supplier_ranked_locations(
+        supplier_id: str,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        metric: Literal["net_sales", "gross_sales", "units", "discounts", "orders"] = "net_sales",
+        group_by: Literal["store", "city", "channel"] = "store",
+        limit: int = 10,
+        category: str | None = None,
+        product_id: str | None = None,
+    ) -> dict:
+        """
+        Rank stores, cities, or channels by a selected metric with optional product/category filters.
+
+        supplier_id must come from trusted server-side context.
+
+        Use this tool for location/channel ranking questions:
+        - 'which city sells hoodies best?' → group_by='city', category='Hoodies', metric='units'
+        - 'which store sells Classic Cotton Tee best?' → group_by='store', product_id=... if known
+        - 'online vs physical sales for socks' → group_by='channel', category='Socks'
+        - 'best stores by units sold' → group_by='store', metric='units'
+        - 'which city has the highest sales?' → group_by='city', metric='net_sales'
+
+        group_by selection:
+        - group_by='store'   → compare individual stores
+        - group_by='city'    → compare cities (Stockholm, Uppsala, Göteborg, Online)
+        - group_by='channel' → compare online vs physical
+
+        metric selection:
+        - metric='units'     → units sold by location (use for 'sells the best'/'most popular')
+        - metric='net_sales' → retail net sales by location (DEFAULT)
+        - metric='orders'    → number of orders by location
+
+        Note: When group_by='city', the online store appears as city='Online'.
+        Use group_by='channel' instead for online vs physical comparison.
+        """
+        if not (1 <= limit <= 50):
+            raise ValueError("limit must be between 1 and 50")
+        if date_from and date_to and date_from > date_to:
+            raise ValueError("date_from cannot be after date_to")
+
+        rows = await repo.fetch_supplier_ranked_locations(
+            supplier_id=supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            metric=metric,
+            group_by=group_by,
+            limit=limit,
+            category=category,
+            product_id=product_id,
+        )
+
+        applied_filters = {
+            k: v for k, v in {
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+                "metric": metric,
+                "group_by": group_by,
+                "limit": limit,
+                "category": category,
+                "product_id": product_id,
+            }.items() if v is not None
+        }
+
+        result = build_ranked_locations_result(
+            rows=rows,
+            metric=metric,
+            group_by=group_by,
+            limit=limit,
+            applied_filters=applied_filters,
+        )
+
+        return result.model_dump(mode="json")
+
+    @mcp.tool()
+    async def get_current_supplier_filter_values(
+        supplier_id: str,
+    ) -> dict:
+        """
+        Return distinct filter values available for this supplier: cities, channels, and categories.
+
+        supplier_id must come from trusted server-side context.
+
+        Use this before calling get_current_supplier_ranked_products or
+        get_current_supplier_ranked_locations when you need to validate or discover
+        available filter values (e.g. exact category names, available cities).
+        Only returns values that have actual sales data.
+        """
+        filter_data = await repo.fetch_supplier_filter_values(supplier_id=supplier_id)
+        result = build_filter_values_result(filter_data=filter_data)
         return result.model_dump(mode="json")

@@ -30,6 +30,12 @@ class DashboardArtifact(BaseModel):
     description: str | None = None
     data_quality: DataQuality | None = None
 
+    # Optional metadata from agent-oriented tools — ignored by existing dashboard consumers.
+    applied_filters: dict[str, Any] = Field(default_factory=dict)
+    primary_metric: str | None = None
+    dimension: str | None = None
+    result_intent: str | None = None
+
     @classmethod
     def from_tool_result(cls, source_tool: str, payload: ToolResultPayload) -> "DashboardArtifact":
         return cls(
@@ -41,6 +47,10 @@ class DashboardArtifact(BaseModel):
             recommended_visualizations=payload.recommended_visualizations,
             description=payload.description,
             data_quality=payload.data_quality,
+            applied_filters=payload.applied_filters,
+            primary_metric=payload.primary_metric,
+            dimension=payload.dimension,
+            result_intent=payload.result_intent,
         )
 
 

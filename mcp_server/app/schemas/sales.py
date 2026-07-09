@@ -46,3 +46,24 @@ class SupplierStoreBreakdownArgs(SupplierDateRange):
 
 class SupplierProductsArgs(SupplierDateRange):
     pass
+
+
+class SupplierRankedProductsArgs(SupplierDateRange):
+    """Arguments for the filterable product ranking tool."""
+
+    metric: SupplierSalesMetric = "net_sales"
+    limit: int = Field(default=10, ge=1, le=50)
+    city: str | None = None
+    store_id: str | None = None
+    channel: Literal["online", "physical"] | None = None
+    category: str | None = None
+
+
+class SupplierRankedLocationsArgs(SupplierDateRange):
+    """Arguments for the filterable location ranking tool."""
+
+    metric: SupplierSalesMetric = "net_sales"
+    group_by: Literal["store", "city", "channel"] = "store"
+    limit: int = Field(default=10, ge=1, le=50)
+    category: str | None = None
+    product_id: str | None = None

@@ -14,6 +14,14 @@ async def mcp_call_tool(url: str, tool_name: str, arguments: dict[str, Any]) -> 
             await session.initialize()
             result = await session.call_tool(tool_name, arguments=arguments)
 
+            if result.isError:
+                error_text = (
+                    getattr(result.content[0], "text", "unknown error")
+                    if result.content
+                    else "unknown error"
+                )
+                raise RuntimeError(f"MCP tool '{tool_name}' returned error: {error_text}")
+
             if result.structuredContent is not None:
                 return result.structuredContent  # type: ignore[return-value]
 

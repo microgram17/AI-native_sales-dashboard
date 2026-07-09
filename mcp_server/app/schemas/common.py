@@ -102,6 +102,13 @@ class ToolResult(BaseModel):
     description: str | None = None
     data_quality: DataQuality | None = None
 
+    # Optional metadata fields — ignored by existing dashboard consumers.
+    # Used by agent-oriented tools to communicate intent and applied filters.
+    applied_filters: dict[str, Any] = Field(default_factory=dict)
+    primary_metric: str | None = None
+    dimension: str | None = None
+    result_intent: str | None = None  # "single_winner" | "ranking" | "timeseries" | "breakdown"
+
     @model_validator(mode="after")
     def validate_visualization_keys_exist(self) -> "ToolResult":
         column_keys = {column.key for column in self.columns}

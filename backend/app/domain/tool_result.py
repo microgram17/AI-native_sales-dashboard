@@ -37,3 +37,10 @@ class ToolResultPayload(BaseModel):
     recommended_visualizations: list[VisualizationSpec] = Field(default_factory=list)
     description: str | None = None
     data_quality: DataQuality | None = None
+
+    # Optional metadata fields — mirrors mcp_server ToolResult.
+    # Ignored by existing dashboard consumers; used by agent-oriented tools.
+    applied_filters: dict[str, Any] = Field(default_factory=dict)
+    primary_metric: str | None = None
+    dimension: str | None = None
+    result_intent: str | None = None  # "single_winner" | "ranking" | "timeseries" | "breakdown"

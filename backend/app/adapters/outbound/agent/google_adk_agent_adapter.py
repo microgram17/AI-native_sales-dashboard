@@ -27,6 +27,8 @@ _SOURCE_TOOL = {
     "get_product_timeseries": "get_current_supplier_product_timeseries",
     "get_top_products": "get_current_supplier_top_products",
     "get_store_breakdown": "get_current_supplier_store_breakdown",
+    "get_ranked_products": "get_current_supplier_ranked_products",
+    "get_ranked_locations": "get_current_supplier_ranked_locations",
 }
 
 _SYSTEM_INSTRUCTION = (
@@ -132,7 +134,7 @@ def _build_runtime_block(ctx: AgentRuntimeContext) -> str:
 
 def _compact_summary(payload: ToolResultPayload) -> dict[str, Any]:
     """Return compact data for the LLM — first 10 rows only, full payload goes to frontend."""
-    return {
+    result: dict[str, Any] = {
         "title": payload.title,
         "result_type": payload.result_type,
         "description": payload.description,
@@ -140,6 +142,13 @@ def _compact_summary(payload: ToolResultPayload) -> dict[str, Any]:
         "columns": [col.model_dump() for col in payload.columns],
         "rows_preview": payload.rows[:10],
     }
+    if payload.result_intent is not None:
+        result["result_intent"] = payload.result_intent
+    if payload.primary_metric is not None:
+        result["primary_metric"] = payload.primary_metric
+    if payload.applied_filters:
+        result["applied_filters"] = payload.applied_filters
+    return result
 
 
 def _build_session_context_block(session_state: ChatSessionState) -> str:
@@ -166,7 +175,14 @@ def _build_session_context_block(session_state: ChatSessionState) -> str:
     if "grain" in filters:
         lines.append(f"- Previous grain: {filters['grain']}")
 
-    if session_state.last_tool_used:
+        if "city" in filters and filters["city"]:
+            lines.append(f"- Previous city filter: {filters['city']}")
+        if "channel" in filters and filters["channel"]:
+            lines.append(f"- Previous channel filter: {filters['channel']}")
+        if "category" in filters and filters["category"]:
+            lines.append(f"- Previous category filter: {filters['category']}")
+        if "group_by" in filters:
+            lines.append(f"- Previous group_by: {filters['group_by']}")
         lines.append(f"- Previous tool called: {session_state.last_tool_used}")
 
     lines.append(f"- Previous user message: \"{session_state.last_user_message}\"")
@@ -184,6 +200,8 @@ def _build_session_context_block(session_state: ChatSessionState) -> str:
         "- If the user asks about stores, locations, or channels, call get_store_breakdown with the previous date range.",
         "- If the user asks about trends, changes over time, or historical patterns, call get_product_timeseries with the previous date range.",
         "- If the user asks about overall sales summary, call get_sales_summary with the previous date range.",
+        "- If the user asks about the best product in a specific city, store, channel, or category, call get_ranked_products with those filters.",
+        "- If the user asks which city, store, or channel performs best, call get_ranked_locations.",
         "- Only change the date range if the user explicitly mentions a different period.",
     ]
 
@@ -407,6 +425,143 @@ class GoogleAdkAgentAdapter(AgentPort):
                 )
             return summary
 
+        async def get_ranked_products(
+            date_from: str | None = None,
+            date_to: str | None = None,
+            metric: Literal["net_sales", "gross_sales", "units", "orders", "discounts"] = "net_sales",
+            limit: int = 10,
+            city: str | None = None,
+            store_id: str | None = None,
+            channel: Literal["online", "physical"] | None = None,
+            category: str | None = None,
+        ) -> dict[str, Any]:
+            """Rank products by a retail sell-through metric with optional dimension filters.
+
+            PREFER this tool over get_top_products when the question includes a location or
+            category filter, or when the user asks for a single winner.
+
+            When to use:
+            - 'what product sells the best in Stockholm?' → city='Stockholm', metric='units', limit=1
+            - 'top 8 products by units in Stockholm' → city='Stockholm', metric='units', limit=8
+            - 'highest revenue products online' → channel='online', metric='net_sales'
+            - 'best-selling hoodies in Q1' → category='Hoodies', metric='units', date range set
+            - 'top products by units in December' → metric='units', date range set
+
+            metric selection:
+            - metric='units'     → 'sells the best' / 'most popular' / 'most sold' / volume
+            - metric='net_sales' → 'highest sales' / 'revenue' / 'top by value' (DEFAULT)
+            - metric='orders'    → products in the most orders
+            - metric='discounts' → most discounted products
+
+            IMPORTANT: For 'best seller' or 'most popular' without saying 'revenue/value',
+            you MUST use metric='units'.
+
+            limit=1 returns a single winner; limit>1 returns a ranked list.
+
+            Note: online stores have city='Online'. Use channel='online' for online-only queries.
+
+            Date parameters: resolve all relative phrases using runtime context before calling.
+            supplier_id is injected automatically — do not pass it.
+            """
+            if metric not in _ALLOWED_METRICS:
+                metric = "net_sales"
+            if channel not in {None, "online", "physical"}:
+                channel = None
+            limit = max(1, min(limit, 50))
+            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            used_filters.update({
+                "date_from": date_from, "date_to": date_to,
+                "metric": metric, "limit": limit,
+                "city": city, "store_id": store_id,
+                "channel": channel, "category": category,
+            })
+            payload = await self._port.get_ranked_products(
+                supplier_id=user.supplier_id,
+                date_from=date_from,
+                date_to=date_to,
+                metric=metric,
+                limit=limit,
+                city=city,
+                store_id=store_id,
+                channel=channel,
+                category=category,
+            )
+            collected.append((_SOURCE_TOOL["get_ranked_products"], payload))
+            tools_used.append("get_ranked_products")
+            summary = _compact_summary(payload)
+            if was_clamped:
+                summary["data_range_note"] = (
+                    f"Dates were clamped to the available data range "
+                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
+                    "Mention this limitation in your response."
+                )
+            return summary
+
+        async def get_ranked_locations(
+            date_from: str | None = None,
+            date_to: str | None = None,
+            metric: Literal["net_sales", "gross_sales", "units", "orders", "discounts"] = "net_sales",
+            group_by: Literal["store", "city", "channel"] = "store",
+            limit: int = 10,
+            category: str | None = None,
+            product_id: str | None = None,
+        ) -> dict[str, Any]:
+            """Rank stores, cities, or channels by a retail sell-through metric.
+
+            Use this for location/channel ranking questions:
+            - 'which city sells hoodies best?' → group_by='city', category='Hoodies', metric='units'
+            - 'which store sells Classic Cotton Tee best?' → group_by='store', product_id if known
+            - 'online vs physical sales for socks' → group_by='channel', category='Socks'
+            - 'best stores by units sold' → group_by='store', metric='units'
+            - 'which city has the highest sales?' → group_by='city', metric='net_sales'
+
+            group_by selection:
+            - group_by='store'   → compare individual stores (DEFAULT)
+            - group_by='city'    → compare cities (Stockholm, Uppsala, Göteborg, Online)
+            - group_by='channel' → compare online vs physical
+
+            metric selection:
+            - metric='units'     → sells the best / most popular by location
+            - metric='net_sales' → highest retail sales by location (DEFAULT)
+
+            Note: When group_by='city', online stores appear as city='Online'.
+            Use group_by='channel' for online vs physical comparison.
+
+            product_id: pass if you know the specific product ID (get it via get_supplier_products first).
+            supplier_id is injected automatically — do not pass it.
+            """
+            if metric not in _ALLOWED_METRICS:
+                metric = "net_sales"
+            if group_by not in {"store", "city", "channel"}:
+                group_by = "store"
+            limit = max(1, min(limit, 50))
+            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            used_filters.update({
+                "date_from": date_from, "date_to": date_to,
+                "metric": metric, "group_by": group_by, "limit": limit,
+                "category": category, "product_id": product_id,
+            })
+            payload = await self._port.get_ranked_locations(
+                supplier_id=user.supplier_id,
+                date_from=date_from,
+                date_to=date_to,
+                metric=metric,
+                group_by=group_by,
+                limit=limit,
+                category=category,
+                product_id=product_id,
+            )
+            collected.append((_SOURCE_TOOL["get_ranked_locations"], payload))
+            tools_used.append("get_ranked_locations")
+            summary = _compact_summary(payload)
+            if was_clamped:
+                summary["data_range_note"] = (
+                    f"Dates were clamped to the available data range "
+                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
+                    "Mention this limitation in your response."
+                )
+            return summary
+
         # Build agent per-request: tools capture request-scoped state.
         # Instruction = base constant + per-request runtime context block + optional session context.
         session_block = _build_session_context_block(session_state)
@@ -417,7 +572,14 @@ class GoogleAdkAgentAdapter(AgentPort):
             name="supplier_sales_agent",
             model=LiteLlm(model=self._agent_model),
             instruction=full_instruction,
-            tools=[get_sales_summary, get_product_timeseries, get_top_products, get_store_breakdown],
+            tools=[
+                get_sales_summary,
+                get_product_timeseries,
+                get_top_products,
+                get_store_breakdown,
+                get_ranked_products,
+                get_ranked_locations,
+            ],
         )
 
         session_service = InMemorySessionService()

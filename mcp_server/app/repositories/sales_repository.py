@@ -21,6 +21,15 @@ _GRAIN_SQL: dict[TimeGrain, str] = {
     "month": "date_trunc('month', o.order_date)::date",
 }
 
+# Metric SQL expressions against v_supplier_sales_facts columns (alias: f).
+_VIEW_METRIC_SQL: dict[str, str] = {
+    "net_sales": "SUM(f.net_sales)",
+    "gross_sales": "SUM(f.gross_sales)",
+    "units": "SUM(f.quantity)",
+    "discounts": "SUM(f.discounts)",
+    "orders": "COUNT(DISTINCT f.order_id)",
+}
+
 
 class SalesRepository:
     def __init__(self, pool: AsyncConnectionPool) -> None:
@@ -347,3 +356,149 @@ class SalesRepository:
                 "date_to": date_to,
             },
         )
+
+    # -------------------------------------------------------------------------
+    # Agent-oriented methods — use v_supplier_sales_facts view
+    # -------------------------------------------------------------------------
+
+    async def fetch_supplier_ranked_products(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        metric: str,
+        limit: int,
+        city: str | None = None,
+        store_id: str | None = None,
+        channel: str | None = None,
+        category: str | None = None,
+    ) -> list[dict]:
+        """Rank products by metric with optional dimension filters.
+
+        Uses v_supplier_sales_facts. Only completed orders are included (view-filtered).
+        """
+        metric_expr = _VIEW_METRIC_SQL[metric]
+
+        query = f"""
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY {metric_expr} DESC) AS rank,
+                f.product_id,
+                f.product_name,
+                f.category,
+                ROUND(({metric_expr})::numeric, 2) AS {metric}
+            FROM v_supplier_sales_facts f
+            WHERE f.supplier_id = %(supplier_id)s
+              AND (%(date_from)s::date IS NULL OR f.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR f.order_date <= %(date_to)s::date)
+              AND (%(city)s::text IS NULL OR f.city = %(city)s::text)
+              AND (%(store_id)s::text IS NULL OR f.store_id = %(store_id)s::text)
+              AND (%(channel)s::text IS NULL OR f.channel = %(channel)s::text)
+              AND (%(category)s::text IS NULL OR f.category = %(category)s::text)
+            GROUP BY f.product_id, f.product_name, f.category
+            ORDER BY {metric_expr} DESC
+            LIMIT %(limit)s;
+        """
+
+        return await self._fetch_all(
+            query,
+            {
+                "supplier_id": supplier_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "city": city,
+                "store_id": store_id,
+                "channel": channel,
+                "category": category,
+                "limit": limit,
+            },
+        )
+
+    async def fetch_supplier_ranked_locations(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        metric: str,
+        group_by: str,
+        limit: int,
+        category: str | None = None,
+        product_id: str | None = None,
+    ) -> list[dict]:
+        """Rank stores, cities, or channels by metric with optional product/category filters.
+
+        Uses v_supplier_sales_facts. Only completed orders are included (view-filtered).
+        """
+        metric_expr = _VIEW_METRIC_SQL[metric]
+
+        group_id_col, group_name_col = {
+            "store": ("f.store_id", "f.store_name"),
+            "city": ("f.city", "f.city"),
+            "channel": ("f.channel", "f.channel"),
+        }[group_by]
+
+        query = f"""
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY {metric_expr} DESC) AS rank,
+                {group_id_col} AS group_id,
+                {group_name_col} AS group_name,
+                ROUND(({metric_expr})::numeric, 2) AS {metric}
+            FROM v_supplier_sales_facts f
+            WHERE f.supplier_id = %(supplier_id)s
+              AND (%(date_from)s::date IS NULL OR f.order_date >= %(date_from)s::date)
+              AND (%(date_to)s::date IS NULL OR f.order_date <= %(date_to)s::date)
+              AND (%(category)s::text IS NULL OR f.category = %(category)s::text)
+              AND (%(product_id)s::text IS NULL OR f.product_id = %(product_id)s::text)
+            GROUP BY {group_id_col}, {group_name_col}
+            ORDER BY {metric_expr} DESC
+            LIMIT %(limit)s;
+        """
+
+        return await self._fetch_all(
+            query,
+            {
+                "supplier_id": supplier_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "category": category,
+                "product_id": product_id,
+                "limit": limit,
+            },
+        )
+
+    async def fetch_supplier_filter_values(
+        self,
+        *,
+        supplier_id: str,
+    ) -> dict:
+        """Return distinct filter values available for this supplier.
+
+        Returns cities, channels, and categories.
+        Uses v_supplier_sales_facts so only values with actual sales data are returned.
+        """
+        cities = [
+            row["city"]
+            for row in await self._fetch_all(
+                "SELECT DISTINCT f.city FROM v_supplier_sales_facts f "
+                "WHERE f.supplier_id = %(supplier_id)s ORDER BY f.city;",
+                {"supplier_id": supplier_id},
+            )
+        ]
+        channels = [
+            row["channel"]
+            for row in await self._fetch_all(
+                "SELECT DISTINCT f.channel FROM v_supplier_sales_facts f "
+                "WHERE f.supplier_id = %(supplier_id)s ORDER BY f.channel;",
+                {"supplier_id": supplier_id},
+            )
+        ]
+        categories = [
+            row["category"]
+            for row in await self._fetch_all(
+                "SELECT DISTINCT f.category FROM v_supplier_sales_facts f "
+                "WHERE f.supplier_id = %(supplier_id)s ORDER BY f.category;",
+                {"supplier_id": supplier_id},
+            )
+        ]
+        return {"cities": cities, "channels": channels, "categories": categories}
