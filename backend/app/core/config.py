@@ -14,6 +14,9 @@ class Settings(BaseSettings):
 
     mcp_server_url: str = "http://mcp_server:8000/mcp"
     cors_origins: list[str] = ["*"]
+    agent_model: str = "openai/gpt-4.1-mini"
+    openai_api_key: str | None = None
+    google_api_key: str | None = None
 
 
 @lru_cache

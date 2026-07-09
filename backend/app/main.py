@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.adapters.inbound.api.chat_routes import router as chat_router
 from app.adapters.inbound.api.dashboard_routes import router as dashboard_router
 from app.core.config import get_settings
 
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(dashboard_router)
+    app.include_router(chat_router)
 
     @app.get("/health")
     async def health() -> dict:
