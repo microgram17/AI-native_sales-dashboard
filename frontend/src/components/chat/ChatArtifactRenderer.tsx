@@ -58,11 +58,17 @@ function getVizKeys(artifact: DashboardArtifact): VizKeys {
   return { xKey, yKey, seriesKey, valueKey }
 }
 
+const RANKING_X_CANDIDATES = ['product_name', 'group_name', 'category', 'city', 'store_name', 'channel']
+const METRIC_Y_CANDIDATES = ['units', 'net_sales', 'gross_sales', 'orders', 'discounts', 'value']
+
 function defaultXKey(artifact: DashboardArtifact): string {
   switch (artifact.result_type) {
     case 'timeseries': return 'period'
-    case 'ranking':    return 'product_name'
     case 'breakdown':  return 'group_name'
+    case 'ranking': {
+      const firstRow = artifact.rows[0] ?? {}
+      return RANKING_X_CANDIDATES.find((k) => k in firstRow) ?? 'product_name'
+    }
     default: {
       const firstRow = artifact.rows[0]
       return Object.keys(firstRow ?? {})[0] ?? 'key'
@@ -73,8 +79,14 @@ function defaultXKey(artifact: DashboardArtifact): string {
 function defaultYKey(artifact: DashboardArtifact): string {
   switch (artifact.result_type) {
     case 'timeseries': return 'value'
-    case 'ranking':    return 'net_sales'
     case 'breakdown':  return 'value'
+    case 'ranking': {
+      const firstRow = artifact.rows[0] ?? {}
+      if (artifact.primary_metric && artifact.primary_metric in firstRow) {
+        return artifact.primary_metric
+      }
+      return METRIC_Y_CANDIDATES.find((k) => k in firstRow) ?? 'value'
+    }
     default: {
       const firstRow = artifact.rows[0]
       return Object.keys(firstRow ?? {})[1] ?? 'value'
@@ -291,6 +303,49 @@ function ArtifactMetricCards({
   return <ArtifactTable artifact={artifact} />
 }
 
+function isSingleWinner(artifact: DashboardArtifact): boolean {
+  return (
+    artifact.result_intent === 'single_winner' ||
+    (artifact.result_type === 'ranking' && artifact.rows.length === 1)
+  )
+}
+
+function ArtifactSingleWinner({ artifact }: { artifact: DashboardArtifact }) {
+  const row = artifact.rows[0]
+  const cols = artifact.columns as Array<{ key: string; label: string }>
+
+  const nameKey = RANKING_X_CANDIDATES.find((k) => k in row)
+  const metricKey =
+    artifact.primary_metric && artifact.primary_metric in row
+      ? artifact.primary_metric
+      : METRIC_Y_CANDIDATES.find((k) => k in row)
+
+  const metricLabel = cols.find((c) => c.key === metricKey)?.label ?? metricKey ?? ''
+  const categoryVal =
+    'category' in row && nameKey !== 'category' ? String(row['category'] ?? '') : null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', padding: '0.25rem 0' }}>
+      {nameKey && (
+        <div style={{ fontSize: '1rem', fontWeight: 600, lineHeight: 1.3 }}>
+          {String(row[nameKey] ?? '')}
+        </div>
+      )}
+      {categoryVal && (
+        <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{categoryVal}</div>
+      )}
+      {metricKey && (
+        <div style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>
+          {metricLabel}:{' '}
+          <span style={{ fontWeight: 600, color: 'inherit' }}>
+            {formatShortNumber(row[metricKey])}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ChatArtifactRenderer({ artifact }: ChatArtifactRendererProps) {
   if (artifact.rows.length === 0) {
     return (
@@ -308,6 +363,29 @@ export function ChatArtifactRenderer({ artifact }: ChatArtifactRendererProps) {
         <div style={{ fontSize: '0.8rem', color: 'var(--muted)', fontStyle: 'italic' }}>
           No data available.
         </div>
+      </div>
+    )
+  }
+
+  if (isSingleWinner(artifact)) {
+    return (
+      <div
+        style={{
+          marginTop: '0.75rem',
+          padding: '0.75rem 1rem',
+          background: 'var(--surface, #1e293b)',
+          borderRadius: '8px',
+        }}
+      >
+        <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem', color: 'var(--muted)' }}>
+          {artifact.title}
+        </div>
+        {artifact.description && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>
+            {artifact.description}
+          </div>
+        )}
+        <ArtifactSingleWinner artifact={artifact} />
       </div>
     )
   }

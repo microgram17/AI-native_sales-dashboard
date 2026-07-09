@@ -20,6 +20,8 @@ export interface DashboardArtifact {
   rows: Array<Record<string, unknown>>
   recommended_visualizations?: Array<Record<string, unknown>>
   data_quality?: Record<string, unknown>
+  primary_metric?: string
+  result_intent?: string
 }
 
 export interface DashboardResponse {

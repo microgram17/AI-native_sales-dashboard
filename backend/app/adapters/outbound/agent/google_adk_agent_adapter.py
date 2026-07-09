@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from datetime import date
 from typing import Any, Literal
 
 from google.adk import Agent, Runner
@@ -9,6 +8,15 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+from app.adapters.outbound.agent.agent_prompt_builder import (
+    build_runtime_block,
+    build_session_context_block,
+)
+from app.adapters.outbound.agent.agent_result_utils import (
+    annotate_clamped_summary,
+    clamp_dates,
+    compact_summary,
+)
 from app.application.ports.agent_port import AgentPort
 from app.application.ports.supplier_analytics_port import SupplierAnalyticsPort
 from app.domain.agent_runtime_context import AgentRuntimeContext
@@ -42,170 +50,6 @@ _SYSTEM_INSTRUCTION = (
     "If the user asks a general non-data question, answer in text only — do not call any tool.\n"
     "You cannot change the supplier identity; it is set by the server."
 )
-
-
-def _clamp_dates(
-    date_from: str | None,
-    date_to: str | None,
-    ctx: AgentRuntimeContext,
-) -> tuple[str | None, str | None, bool]:
-    """Clamp date_from/date_to to the available data range.
-
-    Returns (clamped_from, clamped_to, was_clamped).
-    If either value cannot be parsed as an ISO date, it is returned unchanged
-    and was_clamped is False for that value.
-    """
-    was_clamped = False
-
-    def _parse(s: str | None) -> date | None:
-        if s is None:
-            return None
-        try:
-            return date.fromisoformat(s)
-        except ValueError:
-            return None
-
-    from_date = _parse(date_from)
-    to_date = _parse(date_to)
-
-    if from_date is not None:
-        clamped = max(ctx.available_data_from, min(from_date, ctx.available_data_to))
-        if clamped != from_date:
-            from_date = clamped
-            was_clamped = True
-
-    if to_date is not None:
-        clamped = max(ctx.available_data_from, min(to_date, ctx.available_data_to))
-        if clamped != to_date:
-            to_date = clamped
-            was_clamped = True
-
-    return (
-        from_date.isoformat() if from_date is not None else date_from,
-        to_date.isoformat() if to_date is not None else date_to,
-        was_clamped,
-    )
-
-
-def _build_runtime_block(ctx: AgentRuntimeContext) -> str:
-    """Build the per-request runtime context block appended to the agent instruction."""
-    cur = ctx.current_date
-    y = cur.year
-    data_from = ctx.available_data_from
-    data_to = ctx.available_data_to
-
-    this_year_to = min(cur, data_to)
-
-    # December: if Dec of current year starts after available_data_to, fall back to prior year.
-    dec_start_cur = date(y, 12, 1)
-    if dec_start_cur > data_to:
-        dec_from = date(y - 1, 12, 1)
-        dec_to = date(y - 1, 12, 31)
-        dec_entry = (
-            f"- 'December' (no year) → date_from={dec_from.isoformat()}, date_to={dec_to.isoformat()}"
-            f" (Dec {y} is not yet in available data; using Dec {y - 1})"
-        )
-    else:
-        dec_from = dec_start_cur
-        dec_to = min(date(y, 12, 31), data_to)
-        dec_entry = f"- 'December' (no year) → date_from={dec_from.isoformat()}, date_to={dec_to.isoformat()}"
-
-    lines = [
-        "Runtime context — resolve ALL date references using these values BEFORE calling any tool:",
-        f"- Current analysis date: {cur.isoformat()}",
-        f"- Available sales data: {data_from.isoformat()} through {data_to.isoformat()}",
-        f"- 'this year' → date_from={date(y, 1, 1).isoformat()}, date_to={this_year_to.isoformat()}",
-        f"- 'this month' → date_from={date(y, cur.month, 1).isoformat()}, date_to={min(cur, data_to).isoformat()}",
-        f"- 'last year' → date_from={date(y - 1, 1, 1).isoformat()}, date_to={date(y - 1, 12, 31).isoformat()}",
-        f"- 'Q1' / 'first quarter' (no year) → date_from={date(y, 1, 1).isoformat()}, date_to={date(y, 3, 31).isoformat()}",
-        f"- 'Q2' / 'second quarter' (no year) → date_from={date(y, 4, 1).isoformat()}, date_to={date(y, 6, 30).isoformat()}",
-        f"- 'Q3' / 'third quarter' (no year) → date_from={date(y, 7, 1).isoformat()}, date_to={date(y, 9, 30).isoformat()}",
-        f"- 'Q4' / 'fourth quarter' (no year) → date_from={date(y, 10, 1).isoformat()}, date_to={date(y, 12, 31).isoformat()}",
-        dec_entry,
-        f"- For other month names without a year: if that month in {y} has not yet occurred or "
-        f"exceeds {data_to.isoformat()}, use the same month in {y - 1} instead.",
-        f"- Data beyond {data_to.isoformat()}: explain this limitation to the user; do not fabricate results.",
-        f"- Data before {data_from.isoformat()}: explain that data starts at {data_from.isoformat()}.",
-        "- Always pass resolved ISO dates (YYYY-MM-DD) as date_from and date_to to tools."
-        " Never pass unresolved relative phrases.",
-    ]
-    return "\n".join(lines)
-
-
-def _compact_summary(payload: ToolResultPayload) -> dict[str, Any]:
-    """Return compact data for the LLM — first 10 rows only, full payload goes to frontend."""
-    result: dict[str, Any] = {
-        "title": payload.title,
-        "result_type": payload.result_type,
-        "description": payload.description,
-        "row_count": len(payload.rows),
-        "columns": [col.model_dump() for col in payload.columns],
-        "rows_preview": payload.rows[:10],
-    }
-    if payload.result_intent is not None:
-        result["result_intent"] = payload.result_intent
-    if payload.primary_metric is not None:
-        result["primary_metric"] = payload.primary_metric
-    if payload.applied_filters:
-        result["applied_filters"] = payload.applied_filters
-    return result
-
-
-def _build_session_context_block(session_state: ChatSessionState) -> str:
-    """Build a compact prior-context block injected into the agent instruction.
-
-    Returns an empty string on the first message in a session (no prior context).
-    """
-    if session_state.last_user_message is None:
-        return ""
-
-    lines = ["Previous interaction context (use this to answer follow-up questions):"]
-
-    filters = session_state.last_filters
-    date_from = filters.get("date_from")
-    date_to = filters.get("date_to")
-    if date_from or date_to:
-        lines.append(f"- Previous date range: date_from={date_from}, date_to={date_to}")
-
-    if "sort_by" in filters:
-        lines.append(f"- Previous sort_by: {filters['sort_by']}")
-    elif "metric" in filters:
-        lines.append(f"- Previous metric: {filters['metric']}")
-
-    if "grain" in filters:
-        lines.append(f"- Previous grain: {filters['grain']}")
-
-        if "city" in filters and filters["city"]:
-            lines.append(f"- Previous city filter: {filters['city']}")
-        if "channel" in filters and filters["channel"]:
-            lines.append(f"- Previous channel filter: {filters['channel']}")
-        if "category" in filters and filters["category"]:
-            lines.append(f"- Previous category filter: {filters['category']}")
-        if "group_by" in filters:
-            lines.append(f"- Previous group_by: {filters['group_by']}")
-        lines.append(f"- Previous tool called: {session_state.last_tool_used}")
-
-    lines.append(f"- Previous user message: \"{session_state.last_user_message}\"")
-
-    if session_state.last_assistant_message:
-        preview = session_state.last_assistant_message[:200]
-        lines.append(f"- Previous assistant response (truncated): \"{preview}\"")
-
-    lines += [
-        "",
-        "Follow-up handling rules:",
-        "- Reuse the previous date range (date_from/date_to) for ALL follow-up questions unless the user explicitly specifies a different time period.",
-        "- If the user asks about top sellers, best products, or rankings, call get_top_products with the previous date range.",
-        "- If the user mentions 'units sold', 'volume', 'quantity', or 'most popular', use sort_by='units' or metric='units' with the previous date range.",
-        "- If the user asks about stores, locations, or channels, call get_store_breakdown with the previous date range.",
-        "- If the user asks about trends, changes over time, or historical patterns, call get_product_timeseries with the previous date range.",
-        "- If the user asks about overall sales summary, call get_sales_summary with the previous date range.",
-        "- If the user asks about the best product in a specific city, store, channel, or category, call get_ranked_products with those filters.",
-        "- If the user asks which city, store, or channel performs best, call get_ranked_locations.",
-        "- Only change the date range if the user explicitly mentions a different period.",
-    ]
-
-    return "\n".join(lines)
 
 
 class GoogleAdkAgentAdapter(AgentPort):
@@ -252,7 +96,7 @@ class GoogleAdkAgentAdapter(AgentPort):
               (e.g. 'this year', 'last month') using the runtime context in the instruction
               BEFORE calling this tool. Never omit when the user specified a time period.
             """
-            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            date_from, date_to, was_clamped = clamp_dates(date_from, date_to, runtime_context)
             used_filters.update({"date_from": date_from, "date_to": date_to})
             payload = await self._port.get_sales_summary(
                 supplier_id=user.supplier_id,
@@ -261,13 +105,8 @@ class GoogleAdkAgentAdapter(AgentPort):
             )
             collected.append((_SOURCE_TOOL["get_sales_summary"], payload))
             tools_used.append("get_sales_summary")
-            summary = _compact_summary(payload)
-            if was_clamped:
-                summary["data_range_note"] = (
-                    f"Dates were clamped to the available data range "
-                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
-                    "Mention this limitation in your response."
-                )
+            summary = compact_summary(payload)
+            annotate_clamped_summary(summary, runtime_context, was_clamped)
             return summary
 
         _ALLOWED_METRICS: frozenset[str] = frozenset({"net_sales", "gross_sales", "units", "orders", "discounts"})
@@ -304,7 +143,7 @@ class GoogleAdkAgentAdapter(AgentPort):
             if grain not in {"week", "month"}:
                 grain = "month"
             limit = max(1, min(limit, 10))
-            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            date_from, date_to, was_clamped = clamp_dates(date_from, date_to, runtime_context)
             used_filters.update({"date_from": date_from, "date_to": date_to, "metric": metric, "grain": grain, "limit": limit})
             payload = await self._port.get_product_timeseries(
                 supplier_id=user.supplier_id,
@@ -316,13 +155,8 @@ class GoogleAdkAgentAdapter(AgentPort):
             )
             collected.append((_SOURCE_TOOL["get_product_timeseries"], payload))
             tools_used.append("get_product_timeseries")
-            summary = _compact_summary(payload)
-            if was_clamped:
-                summary["data_range_note"] = (
-                    f"Dates were clamped to the available data range "
-                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
-                    "Mention this limitation in your response."
-                )
+            summary = compact_summary(payload)
+            annotate_clamped_summary(summary, runtime_context, was_clamped)
             return summary
 
         async def get_top_products(
@@ -354,7 +188,7 @@ class GoogleAdkAgentAdapter(AgentPort):
             if sort_by not in {"net_sales", "gross_sales", "units", "orders", "discounts"}:
                 sort_by = "net_sales"
             limit = max(1, min(limit, 20))
-            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            date_from, date_to, was_clamped = clamp_dates(date_from, date_to, runtime_context)
             used_filters.update({"date_from": date_from, "date_to": date_to, "sort_by": sort_by, "limit": limit})
             payload = await self._port.get_top_products(
                 supplier_id=user.supplier_id,
@@ -365,13 +199,8 @@ class GoogleAdkAgentAdapter(AgentPort):
             )
             collected.append((_SOURCE_TOOL["get_top_products"], payload))
             tools_used.append("get_top_products")
-            summary = _compact_summary(payload)
-            if was_clamped:
-                summary["data_range_note"] = (
-                    f"Dates were clamped to the available data range "
-                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
-                    "Mention this limitation in your response."
-                )
+            summary = compact_summary(payload)
+            annotate_clamped_summary(summary, runtime_context, was_clamped)
             return summary
 
         async def get_store_breakdown(
@@ -405,7 +234,7 @@ class GoogleAdkAgentAdapter(AgentPort):
                 metric = "net_sales"
             if group_by not in {"store", "city", "channel"}:
                 group_by = "store"
-            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            date_from, date_to, was_clamped = clamp_dates(date_from, date_to, runtime_context)
             used_filters.update({"date_from": date_from, "date_to": date_to, "metric": metric, "group_by": group_by})
             payload = await self._port.get_store_breakdown(
                 supplier_id=user.supplier_id,
@@ -416,13 +245,8 @@ class GoogleAdkAgentAdapter(AgentPort):
             )
             collected.append((_SOURCE_TOOL["get_store_breakdown"], payload))
             tools_used.append("get_store_breakdown")
-            summary = _compact_summary(payload)
-            if was_clamped:
-                summary["data_range_note"] = (
-                    f"Dates were clamped to the available data range "
-                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
-                    "Mention this limitation in your response."
-                )
+            summary = compact_summary(payload)
+            annotate_clamped_summary(summary, runtime_context, was_clamped)
             return summary
 
         async def get_ranked_products(
@@ -468,7 +292,7 @@ class GoogleAdkAgentAdapter(AgentPort):
             if channel not in {None, "online", "physical"}:
                 channel = None
             limit = max(1, min(limit, 50))
-            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            date_from, date_to, was_clamped = clamp_dates(date_from, date_to, runtime_context)
             used_filters.update({
                 "date_from": date_from, "date_to": date_to,
                 "metric": metric, "limit": limit,
@@ -488,13 +312,8 @@ class GoogleAdkAgentAdapter(AgentPort):
             )
             collected.append((_SOURCE_TOOL["get_ranked_products"], payload))
             tools_used.append("get_ranked_products")
-            summary = _compact_summary(payload)
-            if was_clamped:
-                summary["data_range_note"] = (
-                    f"Dates were clamped to the available data range "
-                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
-                    "Mention this limitation in your response."
-                )
+            summary = compact_summary(payload)
+            annotate_clamped_summary(summary, runtime_context, was_clamped)
             return summary
 
         async def get_ranked_locations(
@@ -535,7 +354,7 @@ class GoogleAdkAgentAdapter(AgentPort):
             if group_by not in {"store", "city", "channel"}:
                 group_by = "store"
             limit = max(1, min(limit, 50))
-            date_from, date_to, was_clamped = _clamp_dates(date_from, date_to, runtime_context)
+            date_from, date_to, was_clamped = clamp_dates(date_from, date_to, runtime_context)
             used_filters.update({
                 "date_from": date_from, "date_to": date_to,
                 "metric": metric, "group_by": group_by, "limit": limit,
@@ -553,19 +372,14 @@ class GoogleAdkAgentAdapter(AgentPort):
             )
             collected.append((_SOURCE_TOOL["get_ranked_locations"], payload))
             tools_used.append("get_ranked_locations")
-            summary = _compact_summary(payload)
-            if was_clamped:
-                summary["data_range_note"] = (
-                    f"Dates were clamped to the available data range "
-                    f"({runtime_context.available_data_from} – {runtime_context.available_data_to}). "
-                    "Mention this limitation in your response."
-                )
+            summary = compact_summary(payload)
+            annotate_clamped_summary(summary, runtime_context, was_clamped)
             return summary
 
         # Build agent per-request: tools capture request-scoped state.
         # Instruction = base constant + per-request runtime context block + optional session context.
-        session_block = _build_session_context_block(session_state)
-        full_instruction = _SYSTEM_INSTRUCTION + "\n\n" + _build_runtime_block(runtime_context)
+        session_block = build_session_context_block(session_state)
+        full_instruction = _SYSTEM_INSTRUCTION + "\n\n" + build_runtime_block(runtime_context)
         if session_block:
             full_instruction += "\n\n" + session_block
         agent = Agent(
