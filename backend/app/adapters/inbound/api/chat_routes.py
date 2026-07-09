@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.adapters.inbound.api.dependencies import get_chat_service, get_user_context
+from app.adapters.inbound.api.dependencies import get_agent_runtime_context, get_chat_service, get_user_context
 from app.application.services.chat_service import ChatService
+from app.domain.agent_runtime_context import AgentRuntimeContext
 from app.domain.chat import ChatRequest, ChatResponse
 from app.domain.user_context import UserContext
 
@@ -14,6 +15,7 @@ router = APIRouter()
 async def post_chat(
     request: ChatRequest,
     user: UserContext = Depends(get_user_context),
+    runtime_context: AgentRuntimeContext = Depends(get_agent_runtime_context),
     service: ChatService = Depends(get_chat_service),
 ) -> ChatResponse:
-    return await service.chat(user=user, message=request.message)
+    return await service.chat(user=user, message=request.message, runtime_context=runtime_context, session_id=request.session_id)

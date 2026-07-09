@@ -6,6 +6,7 @@ import { KpiCard } from './components/KpiCard'
 import { ProductTimeseriesChart } from './components/ProductTimeseriesChart'
 import { TopProductsTable } from './components/TopProductsTable'
 import { StoreBreakdownChart } from './components/StoreBreakdownChart'
+import { ChatPanel } from '../../components/chat/ChatPanel'
 
 function formatCardValue(value: number, unit: string | null): string {
   if (unit === 'SEK') {
@@ -193,6 +194,11 @@ export function DashboardPage() {
           rows={storeBreakdown?.rows ?? []}
           loading={false}
         />
+      </section>
+
+      <section className="panel" style={{ marginTop: '1.5rem' }}>
+        <h2>Chat</h2>
+        <ChatPanel />
       </section>
     </div>
   )
