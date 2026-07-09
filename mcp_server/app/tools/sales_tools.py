@@ -110,35 +110,6 @@ def build_sales_summary_result(*, rows: list[dict]) -> ToolResult:
 def build_top_products_result(
     *,
     rows: list[dict],
-    metric: SupplierSalesMetric,
-    limit: int,
-) -> ToolResult:
-    return ToolResult(
-        result_type="ranking",
-        title=f"Top {limit} products by {_metric_label(metric).lower()}",
-        columns=[
-            ColumnSpec(key="rank", label="Rank", type="integer"),
-            ColumnSpec(key="product_id", label="Product ID", type="string"),
-            ColumnSpec(key="product_name", label="Product", type="string"),
-            ColumnSpec(key="category", label="Category", type="string"),
-            _value_column(metric),
-        ],
-        rows=rows,
-        recommended_visualizations=[
-            VisualizationSpec(
-                type="bar_chart",
-                title=f"Top products by {_metric_label(metric).lower()}",
-                x_key="product_name",
-                y_keys=["value"],
-            )
-        ],
-        data_quality=DataQuality(row_count=len(rows)),
-    )
-
-
-def build_top_products_multi_metric_result(
-    *,
-    rows: list[dict],
     sort_by: SupplierSalesMetric,
     limit: int,
 ) -> ToolResult:
@@ -162,7 +133,7 @@ def build_top_products_multi_metric_result(
                 type="bar_chart",
                 title=f"Top products by {_metric_label(sort_by).lower()}",
                 x_key="product_name",
-                y_keys=["net_sales"],
+                y_keys=[sort_by],
             )
         ],
         data_quality=DataQuality(row_count=len(rows)),
@@ -309,7 +280,7 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
             limit=limit,
         )
 
-        result = build_top_products_multi_metric_result(
+        result = build_top_products_result(
             rows=rows,
             sort_by=sort_by,
             limit=limit,
