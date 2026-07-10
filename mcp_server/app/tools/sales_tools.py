@@ -283,26 +283,6 @@ def build_ranked_locations_result(
     )
 
 
-def build_filter_values_result(*, filter_data: dict) -> ToolResult:
-    """Result builder for get_current_supplier_filter_values."""
-    rows = (
-        [{"filter_type": "city", "value": v} for v in filter_data.get("cities", [])]
-        + [{"filter_type": "channel", "value": v} for v in filter_data.get("channels", [])]
-        + [{"filter_type": "category", "value": v} for v in filter_data.get("categories", [])]
-    )
-    return ToolResult(
-        result_type="table",
-        title="Available filter values",
-        description="Distinct cities, channels, and categories with sales data for this supplier.",
-        columns=[
-            ColumnSpec(key="filter_type", label="Filter type", type="string"),
-            ColumnSpec(key="value", label="Value", type="string"),
-        ],
-        rows=rows,
-        data_quality=DataQuality(row_count=len(rows)),
-    )
-
-
 def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
     @mcp.tool()
     async def get_current_supplier_product_timeseries(
@@ -483,27 +463,9 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
 
         supplier_id must come from trusted server-side context.
 
-        Use this tool when the user asks about best-selling or top-performing products
-        AND the question includes a location or dimension filter, OR when the agent needs
-        a single winner rather than an unfiltered top-N list.
-
-        When to prefer this tool over get_current_supplier_top_products:
-        - 'what product sells the best in Stockholm?' → city='Stockholm', metric='units', limit=1
-        - 'top 8 products by units sold in Stockholm' → city='Stockholm', metric='units', limit=8
-        - 'highest revenue products online' → channel='online', metric='net_sales'
-        - 'best-selling hoodies in Q1' → category='Hoodies', metric='units', date_from/date_to set
-        - 'top products by units in December' → metric='units', date range set
-
-        metric selection:
-        - metric='units'      → best-selling / most popular / volume / quantity sold (use for 'sells the best')
-        - metric='net_sales'  → highest retail sales value / revenue (DEFAULT)
-        - metric='orders'     → products appearing in the most orders
-        - metric='discounts'  → most discounted products
-        - metric='gross_sales' → only when user explicitly says gross sales
-
-        limit: number of products to return (1-50). Use limit=1 for single-winner questions.
-
-        Note: online stores have city='Online'. Use channel='online' for online-only filter.
+        Optional filters: city, store_id, channel, category.
+        limit is the number of products to return (1-50); use limit=1 for a single winner.
+        Note: online stores have city='Online'; use channel='online' for an online-only filter.
         """
         if not (1 <= limit <= 50):
             raise ValueError("limit must be between 1 and 50")
@@ -560,25 +522,10 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
 
         supplier_id must come from trusted server-side context.
 
-        Use this tool for location/channel ranking questions:
-        - 'which city sells hoodies best?' → group_by='city', category='Hoodies', metric='units'
-        - 'which store sells Classic Cotton Tee best?' → group_by='store', product_id=... if known
-        - 'online vs physical sales for socks' → group_by='channel', category='Socks'
-        - 'best stores by units sold' → group_by='store', metric='units'
-        - 'which city has the highest sales?' → group_by='city', metric='net_sales'
-
-        group_by selection:
-        - group_by='store'   → compare individual stores
-        - group_by='city'    → compare cities (Stockholm, Uppsala, Göteborg, Online)
-        - group_by='channel' → compare online vs physical
-
-        metric selection:
-        - metric='units'     → units sold by location (use for 'sells the best'/'most popular')
-        - metric='net_sales' → retail net sales by location (DEFAULT)
-        - metric='orders'    → number of orders by location
-
-        Note: When group_by='city', the online store appears as city='Online'.
-        Use group_by='channel' instead for online vs physical comparison.
+        group_by selects the dimension: 'store', 'city', or 'channel'.
+        Optional filters: category, product_id. limit is 1-50.
+        Note: when group_by='city', the online store appears as city='Online';
+        use group_by='channel' for online vs physical comparison.
         """
         if not (1 <= limit <= 50):
             raise ValueError("limit must be between 1 and 50")
@@ -616,22 +563,4 @@ def register_sales_tools(mcp: FastMCP, repo: SalesRepository) -> None:
             applied_filters=applied_filters,
         )
 
-        return result.model_dump(mode="json")
-
-    @mcp.tool()
-    async def get_current_supplier_filter_values(
-        supplier_id: str,
-    ) -> dict:
-        """
-        Return distinct filter values available for this supplier: cities, channels, and categories.
-
-        supplier_id must come from trusted server-side context.
-
-        Use this before calling get_current_supplier_ranked_products or
-        get_current_supplier_ranked_locations when you need to validate or discover
-        available filter values (e.g. exact category names, available cities).
-        Only returns values that have actual sales data.
-        """
-        filter_data = await repo.fetch_supplier_filter_values(supplier_id=supplier_id)
-        result = build_filter_values_result(filter_data=filter_data)
         return result.model_dump(mode="json")

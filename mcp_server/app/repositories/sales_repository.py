@@ -172,52 +172,6 @@ class SalesRepository:
             },
         )
 
-    async def fetch_supplier_top_products(
-        self,
-        *,
-        supplier_id: str,
-        date_from: date | None,
-        date_to: date | None,
-        metric: SupplierSalesMetric,
-        limit: int,
-    ) -> list[dict]:
-        metric_sql = _METRIC_SQL[metric]
-
-        query = f"""
-            SELECT
-                ROW_NUMBER() OVER (ORDER BY {metric_sql} DESC) AS rank,
-                p.product_id,
-                p.product_name,
-                p.category,
-                ROUND(({metric_sql})::numeric, 2) AS value
-            FROM order_items oi
-            JOIN orders o
-                ON o.order_id = oi.order_id
-            JOIN products p
-                ON p.product_id = oi.product_id
-            WHERE p.supplier_id = %(supplier_id)s
-              AND o.order_status = 'completed'
-              AND (%(date_from)s::date IS NULL OR o.order_date >= %(date_from)s::date)
-              AND (%(date_to)s::date IS NULL OR o.order_date <= %(date_to)s::date)
-            GROUP BY
-                p.product_id,
-                p.product_name,
-                p.category
-            ORDER BY
-                value DESC
-            LIMIT %(limit)s;
-        """
-
-        return await self._fetch_all(
-            query,
-            {
-                "supplier_id": supplier_id,
-                "date_from": date_from,
-                "date_to": date_to,
-                "limit": limit,
-            },
-        )
-
     async def fetch_supplier_top_products_multi_metric(
         self,
         *,
@@ -466,39 +420,3 @@ class SalesRepository:
                 "limit": limit,
             },
         )
-
-    async def fetch_supplier_filter_values(
-        self,
-        *,
-        supplier_id: str,
-    ) -> dict:
-        """Return distinct filter values available for this supplier.
-
-        Returns cities, channels, and categories.
-        Uses v_supplier_sales_facts so only values with actual sales data are returned.
-        """
-        cities = [
-            row["city"]
-            for row in await self._fetch_all(
-                "SELECT DISTINCT f.city FROM v_supplier_sales_facts f "
-                "WHERE f.supplier_id = %(supplier_id)s ORDER BY f.city;",
-                {"supplier_id": supplier_id},
-            )
-        ]
-        channels = [
-            row["channel"]
-            for row in await self._fetch_all(
-                "SELECT DISTINCT f.channel FROM v_supplier_sales_facts f "
-                "WHERE f.supplier_id = %(supplier_id)s ORDER BY f.channel;",
-                {"supplier_id": supplier_id},
-            )
-        ]
-        categories = [
-            row["category"]
-            for row in await self._fetch_all(
-                "SELECT DISTINCT f.category FROM v_supplier_sales_facts f "
-                "WHERE f.supplier_id = %(supplier_id)s ORDER BY f.category;",
-                {"supplier_id": supplier_id},
-            )
-        ]
-        return {"cities": cities, "channels": channels, "categories": categories}

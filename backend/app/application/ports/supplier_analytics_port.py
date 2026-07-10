@@ -80,9 +80,3 @@ class SupplierAnalyticsPort(ABC):
         category: str | None = None,
         product_id: str | None = None,
     ) -> ToolResultPayload: ...
-
-    @abstractmethod
-    async def get_filter_values(
-        self,
-        supplier_id: str,
-    ) -> ToolResultPayload: ...

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from pydantic import BaseModel
 
-from pydantic import BaseModel, Field
-
-from app.domain.analytics import Dimension, Metric, ResultIntent
-from app.domain.tool_result import ColumnSpec, DataQuality, ToolResultPayload, VisualizationSpec
+from app.domain.tool_result import ToolResultPayload
 
 
 class UserInfo(BaseModel):
@@ -21,38 +18,19 @@ class KpiCard(BaseModel):
     unit: str | None = None
 
 
-class DashboardArtifact(BaseModel):
-    source_tool: str
-    result_type: str
-    title: str
-    columns: list[ColumnSpec]
-    rows: list[dict[str, Any]]
-    recommended_visualizations: list[VisualizationSpec] = Field(default_factory=list)
-    description: str | None = None
-    data_quality: DataQuality | None = None
+class DashboardArtifact(ToolResultPayload):
+    """A ToolResultPayload annotated with the MCP tool that produced it.
 
-    # Optional metadata from agent-oriented tools — ignored by existing dashboard consumers.
-    applied_filters: dict[str, Any] = Field(default_factory=dict)
-    primary_metric: Metric | None = None
-    dimension: Dimension | None = None
-    result_intent: ResultIntent | None = None
+    Inherits all analytics fields (columns, rows, recommended_visualizations,
+    result_intent, etc.) from ToolResultPayload and adds source_tool so dashboard
+    and chat consumers can locate a specific artifact by its originating tool.
+    """
+
+    source_tool: str
 
     @classmethod
     def from_tool_result(cls, source_tool: str, payload: ToolResultPayload) -> "DashboardArtifact":
-        return cls(
-            source_tool=source_tool,
-            result_type=payload.result_type,
-            title=payload.title,
-            columns=payload.columns,
-            rows=payload.rows,
-            recommended_visualizations=payload.recommended_visualizations,
-            description=payload.description,
-            data_quality=payload.data_quality,
-            applied_filters=payload.applied_filters,
-            primary_metric=payload.primary_metric,
-            dimension=payload.dimension,
-            result_intent=payload.result_intent,
-        )
+        return cls(source_tool=source_tool, **payload.model_dump())
 
 
 class DashboardResponse(BaseModel):

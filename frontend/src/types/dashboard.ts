@@ -21,6 +21,7 @@ export interface DashboardArtifact {
   recommended_visualizations?: Array<Record<string, unknown>>
   data_quality?: Record<string, unknown>
   primary_metric?: string
+  dimension?: string
   result_intent?: string
 }
 

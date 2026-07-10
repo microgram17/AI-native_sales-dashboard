@@ -27,18 +27,10 @@ type VizType = 'line_chart' | 'bar_chart' | 'metric_card' | 'table'
 
 function getVizType(artifact: DashboardArtifact): VizType {
   const viz = artifact.recommended_visualizations?.[0] as Record<string, unknown> | undefined
-  if (viz?.type) {
-    const t = viz.type as string
-    if (t === 'line_chart' || t === 'bar_chart' || t === 'metric_card' || t === 'table') return t
-  }
-  switch (artifact.result_type) {
-    case 'timeseries': return 'line_chart'
-    case 'ranking':    return 'bar_chart'
-    case 'breakdown':  return 'bar_chart'
-    case 'kpi':
-    case 'summary':    return 'metric_card'
-    default:           return 'table'
-  }
+  const t = viz?.type as string | undefined
+  if (t === 'line_chart' || t === 'bar_chart' || t === 'metric_card' || t === 'table') return t
+  // No usable backend visualization spec — render the raw rows as a table.
+  return 'table'
 }
 
 interface VizKeys {
@@ -49,53 +41,16 @@ interface VizKeys {
 }
 
 function getVizKeys(artifact: DashboardArtifact): VizKeys {
+  // The backend (MCP result builder) is authoritative for chart axes. These are
+  // only read once getVizType has returned a chart type, which implies the viz
+  // spec is present and — per the MCP schema — carries x_key and y_keys.
   const viz = artifact.recommended_visualizations?.[0] as Record<string, unknown> | undefined
-  const xKey = (viz?.x_key as string | null) ?? defaultXKey(artifact)
-  const yKeys = viz?.y_keys as string[] | null
-  const yKey = yKeys?.[0] ?? defaultYKey(artifact)
-  const seriesKey = (viz?.series_key as string | null) ?? defaultSeriesKey(artifact)
-  const valueKey = (viz?.value_key as string | null) ?? 'value'
-  return { xKey, yKey, seriesKey, valueKey }
-}
-
-const RANKING_X_CANDIDATES = ['product_name', 'group_name', 'category', 'city', 'store_name', 'channel']
-const METRIC_Y_CANDIDATES = ['units', 'net_sales', 'gross_sales', 'orders', 'discounts', 'value']
-
-function defaultXKey(artifact: DashboardArtifact): string {
-  switch (artifact.result_type) {
-    case 'timeseries': return 'period'
-    case 'breakdown':  return 'group_name'
-    case 'ranking': {
-      const firstRow = artifact.rows[0] ?? {}
-      return RANKING_X_CANDIDATES.find((k) => k in firstRow) ?? 'product_name'
-    }
-    default: {
-      const firstRow = artifact.rows[0]
-      return Object.keys(firstRow ?? {})[0] ?? 'key'
-    }
+  return {
+    xKey: (viz?.x_key as string | undefined) ?? '',
+    yKey: (viz?.y_keys as string[] | undefined)?.[0] ?? '',
+    seriesKey: (viz?.series_key as string | null | undefined) ?? null,
+    valueKey: (viz?.value_key as string | undefined) ?? 'value',
   }
-}
-
-function defaultYKey(artifact: DashboardArtifact): string {
-  switch (artifact.result_type) {
-    case 'timeseries': return 'value'
-    case 'breakdown':  return 'value'
-    case 'ranking': {
-      const firstRow = artifact.rows[0] ?? {}
-      if (artifact.primary_metric && artifact.primary_metric in firstRow) {
-        return artifact.primary_metric
-      }
-      return METRIC_Y_CANDIDATES.find((k) => k in firstRow) ?? 'value'
-    }
-    default: {
-      const firstRow = artifact.rows[0]
-      return Object.keys(firstRow ?? {})[1] ?? 'value'
-    }
-  }
-}
-
-function defaultSeriesKey(artifact: DashboardArtifact): string | null {
-  return artifact.result_type === 'timeseries' ? 'product_name' : null
 }
 
 // --- Sub-renderers ---
@@ -314,11 +269,19 @@ function ArtifactSingleWinner({ artifact }: { artifact: DashboardArtifact }) {
   const row = artifact.rows[0]
   const cols = artifact.columns as Array<{ key: string; label: string }>
 
-  const nameKey = RANKING_X_CANDIDATES.find((k) => k in row)
+  // Name column: the dimension's canonical column, else the first string column.
+  const nameKey =
+    artifact.dimension === 'product'
+      ? 'product_name'
+      : artifact.dimension
+        ? 'group_name'
+        : cols.find((c) => typeof row[c.key] === 'string' && c.key !== 'category')?.key
+
+  // Metric column: the backend-declared primary_metric, else the first numeric column.
   const metricKey =
     artifact.primary_metric && artifact.primary_metric in row
       ? artifact.primary_metric
-      : METRIC_Y_CANDIDATES.find((k) => k in row)
+      : cols.find((c) => typeof row[c.key] === 'number' && c.key !== 'rank')?.key
 
   const metricLabel = cols.find((c) => c.key === metricKey)?.label ?? metricKey ?? ''
   const categoryVal =

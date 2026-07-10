@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from app.adapters.outbound.agent.agent_prompt_builder import (
     build_runtime_block,
     build_session_context_block,
 )
 from app.domain.agent_runtime_context import AgentRuntimeContext
-from app.domain.chat_session import ChatSessionState
 
 _SYSTEM_INSTRUCTION = (
     "You are a supplier-facing retail sell-through analytics assistant.\n"
@@ -22,12 +24,13 @@ _SYSTEM_INSTRUCTION = (
 
 def compose_sales_agent_instruction(
     runtime_context: AgentRuntimeContext,
-    session_state: ChatSessionState,
+    session_state: Mapping[str, Any],
 ) -> str:
     """Compose the full agent instruction for a single request.
 
     Combines the static system instruction, the per-request runtime context block
-    (resolved date ranges), and an optional session context block (prior turn context).
+    (resolved date ranges), and an optional session context block built from the
+    ADK session.state (prior-turn filter context written by the tools).
     """
     session_block = build_session_context_block(session_state)
     instruction = _SYSTEM_INSTRUCTION + "\n\n" + build_runtime_block(runtime_context)

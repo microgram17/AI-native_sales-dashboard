@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
+from typing import Any
 
 from app.domain.agent_runtime_context import AgentRuntimeContext
-from app.domain.chat_session import ChatSessionState
 
 
 def build_runtime_block(ctx: AgentRuntimeContext) -> str:
@@ -51,17 +52,25 @@ def build_runtime_block(ctx: AgentRuntimeContext) -> str:
     return "\n".join(lines)
 
 
-def build_session_context_block(session_state: ChatSessionState) -> str:
-    """Build a compact prior-context block injected into the agent instruction.
+def build_session_context_block(state: Mapping[str, Any]) -> str:
+    """Build a compact prior filter-context block injected into the agent instruction.
 
-    Returns an empty string on the first message in a session (no prior context).
+    Reads the follow-up filter context from ADK session.state (written by the tools
+    via tool_context.state on prior turns). Returns an empty string when there has
+    been no prior tool interaction in this session.
+
+    Note: prior user/assistant message text is intentionally omitted here. ADK
+    session.events carries the full turn-by-turn conversation history and makes
+    it available to the model automatically. This block only injects structured
+    filter state (date ranges, metrics, etc.) that guides follow-up tool routing.
     """
-    if session_state.last_user_message is None:
+    last_tool_used = state.get("last_tool_used")
+    filters = state.get("last_filters") or {}
+    if not last_tool_used and not filters:
         return ""
 
     lines = ["Previous interaction context (use this to answer follow-up questions):"]
 
-    filters = session_state.last_filters
     date_from = filters.get("date_from")
     date_to = filters.get("date_to")
     if date_from or date_to:
@@ -87,14 +96,8 @@ def build_session_context_block(session_state: ChatSessionState) -> str:
         lines.append(f"- Previous store_id filter: {filters['store_id']}")
     if filters.get("product_id"):
         lines.append(f"- Previous product_id filter: {filters['product_id']}")
-    if session_state.last_tool_used:
-        lines.append(f"- Previous tool called: {session_state.last_tool_used}")
-
-    lines.append(f"- Previous user message: \"{session_state.last_user_message}\"")
-
-    if session_state.last_assistant_message:
-        preview = session_state.last_assistant_message[:200]
-        lines.append(f"- Previous assistant response (truncated): \"{preview}\"")
+    if last_tool_used:
+        lines.append(f"- Previous tool called: {last_tool_used}")
 
     lines += [
         "",

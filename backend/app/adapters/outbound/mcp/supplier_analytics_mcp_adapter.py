@@ -172,14 +172,3 @@ class SupplierAnalyticsMcpAdapter(SupplierAnalyticsPort):
             },
         )
         return ToolResultPayload.model_validate(raw)
-
-    async def get_filter_values(
-        self,
-        supplier_id: str,
-    ) -> ToolResultPayload:
-        raw = await mcp_call_tool(
-            self._url,
-            "get_current_supplier_filter_values",
-            {"supplier_id": supplier_id},
-        )
-        return ToolResultPayload.model_validate(raw)

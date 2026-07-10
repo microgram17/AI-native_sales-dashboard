@@ -5,8 +5,6 @@ from datetime import date
 from fastapi import Depends
 
 from app.adapters.outbound.mcp.supplier_analytics_mcp_adapter import SupplierAnalyticsMcpAdapter
-from app.adapters.outbound.session.in_memory_chat_session_store import InMemoryChatSessionStore
-from app.application.ports.chat_session_store_port import ChatSessionStorePort
 from app.application.services.dashboard_service import DashboardService
 from app.auth.demo_user_context import DEMO_USER_CONTEXT
 from app.core.config import Settings, get_settings
@@ -16,9 +14,9 @@ from app.application.services.chat_service import ChatService
 from app.domain.agent_runtime_context import AgentRuntimeContext
 from app.domain.user_context import UserContext
 
-# Singleton session store — must not be recreated per request.
-# All requests share the same InMemoryChatSessionStore instance.
-_session_store = InMemoryChatSessionStore()
+# Singleton agent adapter — must not be recreated per request.
+# Holds the shared InMemorySessionService that maintains ADK session history and state.
+_agent_adapter: GoogleAdkAgentAdapter | None = None
 
 
 def get_user_context() -> UserContext:
@@ -46,22 +44,19 @@ def get_dashboard_service(settings: Settings = Depends(get_settings)) -> Dashboa
 
 
 def get_agent_port(settings: Settings = Depends(get_settings)) -> AgentPort:
-    mcp_adapter = SupplierAnalyticsMcpAdapter(mcp_url=settings.mcp_server_url)
-    return GoogleAdkAgentAdapter(
-        port=mcp_adapter,
-        agent_model=settings.agent_model,
-        openai_api_key=settings.openai_api_key,
-        google_api_key=settings.google_api_key,
-    )
-
-
-def get_chat_session_store() -> ChatSessionStorePort:
-    """Returns the shared singleton session store. Never recreated per request."""
-    return _session_store
+    global _agent_adapter
+    if _agent_adapter is None:
+        mcp_adapter = SupplierAnalyticsMcpAdapter(mcp_url=settings.mcp_server_url)
+        _agent_adapter = GoogleAdkAgentAdapter(
+            port=mcp_adapter,
+            agent_model=settings.agent_model,
+            openai_api_key=settings.openai_api_key,
+            google_api_key=settings.google_api_key,
+        )
+    return _agent_adapter
 
 
 def get_chat_service(
     agent: AgentPort = Depends(get_agent_port),
-    session_store: ChatSessionStorePort = Depends(get_chat_session_store),
 ) -> ChatService:
-    return ChatService(agent=agent, session_store=session_store)
+    return ChatService(agent=agent)
