@@ -1,8 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 
 from app.db.connection import create_pool
-from app.repositories.sales_repository import SalesRepository
-from app.tools.sales_tools import register_sales_tools
 
 
 mcp = FastMCP(
@@ -20,9 +18,6 @@ def health_check() -> dict:
 
 
 pool = create_pool()
-sales_repository = SalesRepository(pool)
-
-register_sales_tools(mcp, sales_repository)
 
 
 if __name__ == "__main__":
