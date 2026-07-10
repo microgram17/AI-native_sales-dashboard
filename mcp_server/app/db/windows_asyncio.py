@@ -1,0 +1,10 @@
+# mcp_server/app/db/windows_asyncio.py
+from __future__ import annotations
+
+import asyncio
+import sys
+
+
+def configure_windows_event_loop() -> None:
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

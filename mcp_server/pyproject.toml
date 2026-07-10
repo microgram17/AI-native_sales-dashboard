@@ -1,23 +1,23 @@
 [project]
-name = "mcp-server"
+name = "sales-mcp-server"
 version = "0.1.0"
-description = "Supplier BI MCP server — exposes sales analytics via the Model Context Protocol"
-readme = "README.md"
-requires-python = ">=3.13"
+description = "Add your description here"
+authors = [
+    { name = "Wille Kolu", email = "wille.kolu10@gmail.com" }
+]
+requires-python = ">=3.12"
 dependencies = [
-    "faker>=40.23.0",
-    "mcp[cli]>=1.28.1",
-    "openpyxl>=3.1.5",
-    "pandas>=2.3.3",
-    "psycopg[binary]>=3.3.4",
-    "psycopg-pool>=3.3.0",
-    "pydantic>=2.13.4",
-    "python-dotenv>=1.2.2",
+    "mcp>=1.28.1",
+    "psycopg[binary]>=3.0,<4.0",
+    "pydantic>=2.13.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "sqlalchemy>=2.0,<3.0",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[project.scripts]
+sales-mcp-server = "sales_mcp_server:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"

@@ -34,11 +34,9 @@ services:
       - "8001:8000"
     volumes:
       - ./mcp_server/app:/app/app
-      - ./data:/data
       - ./mcp_server/scripts:/app/scripts
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/retail_bi
-      - LEGACY_DATA_DIR=/data/legacy_exports
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/retail_bi
     depends_on:
       - postgres
 
