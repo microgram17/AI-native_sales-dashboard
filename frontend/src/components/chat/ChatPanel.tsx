@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import type { DashboardArtifact } from '../../types/dashboard'
 import { sendChatMessage } from '../../api/chat'
 import { ChatMessage } from './ChatMessage'
+import { useTranslation } from '../../i18n/LanguageContext'
 
 interface ChatEntry {
   id: string
@@ -12,6 +13,7 @@ interface ChatEntry {
 }
 
 export function ChatPanel() {
+  const { t } = useTranslation()
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [input, setInput] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -70,7 +72,7 @@ export function ChatPanel() {
               marginTop: '2rem',
             }}
           >
-            Ask an analytics question, e.g. "Show me my top products"
+            {t.chatEmpty}
           </div>
         )}
         {messages.map((msg) => (
@@ -91,7 +93,7 @@ export function ChatPanel() {
               alignSelf: 'flex-start',
             }}
           >
-            Thinking…
+            {t.chatThinking}
           </div>
         )}
         <div ref={bottomRef} />
@@ -108,7 +110,7 @@ export function ChatPanel() {
             borderTop: '1px solid rgba(248,113,113,0.2)',
           }}
         >
-          {mutation.error instanceof Error ? mutation.error.message : 'Request failed. Please try again.'}
+          {mutation.error instanceof Error ? mutation.error.message : t.chatError}
         </div>
       )}
 
@@ -126,7 +128,7 @@ export function ChatPanel() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask a question…"
+          placeholder={t.chatPlaceholder}
           disabled={mutation.isPending}
           style={{
             flex: 1,
@@ -154,7 +156,7 @@ export function ChatPanel() {
             transition: 'opacity 0.15s',
           }}
         >
-          {mutation.isPending ? '…' : 'Send'}
+          {mutation.isPending ? '…' : t.chatSend}
         </button>
       </form>
     </div>

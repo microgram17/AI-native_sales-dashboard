@@ -7,6 +7,8 @@ import { ProductTimeseriesChart } from './components/ProductTimeseriesChart'
 import { TopProductsTable } from './components/TopProductsTable'
 import { StoreBreakdownChart } from './components/StoreBreakdownChart'
 import { ChatPanel } from '../../components/chat/ChatPanel'
+import { useTranslation } from '../../i18n/LanguageContext'
+import { useTheme } from '../../i18n/ThemeContext'
 
 function formatCardValue(value: number, unit: string | null): string {
   if (unit === 'SEK') {
@@ -27,6 +29,9 @@ function findArtifact(
 }
 
 export function DashboardPage() {
+  const { language, setLanguage, t } = useTranslation()
+  const { theme, toggleTheme } = useTheme()
+
   // Shared date range
   const [dateFrom, setDateFrom] = useState('2025-07-01')
   const [dateTo, setDateTo] = useState('2026-06-30')
@@ -97,7 +102,7 @@ export function DashboardPage() {
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="dashboard-title">
-          <h1>Supplier Dashboard</h1>
+          <h1>{t.dashboardTitle}</h1>
           {user && <span className="supplier-tagline">{user.supplier_id}</span>}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -106,13 +111,62 @@ export function DashboardPage() {
               {user.display_name}
             </span>
           )}
+          <div style={{ display: 'flex', gap: '3px', alignItems: 'center', marginLeft: '0.5rem' }}>
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Ljust läge' : 'Mörkt läge'}
+              style={{
+                fontSize: '1.1rem',
+                lineHeight: 1,
+                background: 'none',
+                border: '2px solid transparent',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                padding: '2px 5px',
+              }}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            {/* Language toggle */}
+            <button
+              onClick={() => setLanguage('en')}
+              title="English"
+              style={{
+                fontSize: '1.2rem',
+                lineHeight: 1,
+                background: 'none',
+                border: language === 'en' ? '2px solid var(--accent, #6366f1)' : '2px solid transparent',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                padding: '2px 5px',
+              }}
+            >
+              🇬🇧
+            </button>
+            <button
+              onClick={() => setLanguage('sv')}
+              title="Svenska"
+              style={{
+                fontSize: '1.2rem',
+                lineHeight: 1,
+                background: 'none',
+                border: language === 'sv' ? '2px solid var(--accent, #6366f1)' : '2px solid transparent',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                padding: '2px 5px',
+              }}
+            >
+              🇸🇪
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Shared date range */}
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem' }}>
-          <span style={{ color: 'var(--muted)' }}>From</span>
+          <span style={{ color: 'var(--muted)' }}>{t.dateFrom}</span>
           <input
             type="date"
             value={dateFrom}
@@ -128,7 +182,7 @@ export function DashboardPage() {
           />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem' }}>
-          <span style={{ color: 'var(--muted)' }}>To</span>
+          <span style={{ color: 'var(--muted)' }}>{t.dateTo}</span>
           <input
             type="date"
             value={dateTo}
@@ -149,10 +203,10 @@ export function DashboardPage() {
       <section className="kpi-grid">
         {summary ? (
           <>
-            <KpiCard label="Net Sales" value={formatCardValue(summary.net_sales, 'SEK')} loading={summaryLoading} />
-            <KpiCard label="Gross Sales" value={formatCardValue(summary.gross_sales, 'SEK')} loading={summaryLoading} />
-            <KpiCard label="Units Sold" value={formatCardValue(summary.units, null)} loading={summaryLoading} />
-            <KpiCard label="Orders" value={formatCardValue(summary.orders, null)} loading={summaryLoading} />
+            <KpiCard label={t.netSales} value={formatCardValue(summary.net_sales, 'SEK')} loading={summaryLoading} />
+            <KpiCard label={t.grossSales} value={formatCardValue(summary.gross_sales, 'SEK')} loading={summaryLoading} />
+            <KpiCard label={t.unitsSold} value={formatCardValue(summary.units, null)} loading={summaryLoading} />
+            <KpiCard label={t.orders} value={formatCardValue(summary.orders, null)} loading={summaryLoading} />
           </>
         ) : (
           Array.from({ length: 4 }).map((_, i) => (
@@ -163,7 +217,7 @@ export function DashboardPage() {
 
       <div className="dashboard-grid">
         <section className="panel">
-          <h2>Product Revenue Trend</h2>
+          <h2>{t.productRevenueTrend}</h2>
           <ProductTimeseriesChart
             rows={timeseries?.rows ?? []}
             loading={timeseriesLoading}
@@ -178,7 +232,7 @@ export function DashboardPage() {
         </section>
 
         <section className="panel">
-          <h2>Top Products</h2>
+          <h2>{t.topProducts}</h2>
           <TopProductsTable
             rows={topProducts?.rows ?? []}
             loading={topLoading}
@@ -189,7 +243,7 @@ export function DashboardPage() {
       </div>
 
       <section className="panel">
-        <h2>Store Breakdown</h2>
+        <h2>{t.storeBreakdown}</h2>
         <StoreBreakdownChart
           rows={storeBreakdown?.rows ?? []}
           loading={false}
@@ -197,7 +251,7 @@ export function DashboardPage() {
       </section>
 
       <section className="panel" style={{ marginTop: '1.5rem' }}>
-        <h2>Chat</h2>
+        <h2>{t.chat}</h2>
         <ChatPanel />
       </section>
     </div>

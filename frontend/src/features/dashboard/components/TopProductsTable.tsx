@@ -1,4 +1,5 @@
 import type { Metric, TopProductsRow } from '../../../types/dashboard'
+import { useTranslation } from '../../../i18n/LanguageContext'
 
 interface TopProductsTableProps {
   rows: TopProductsRow[]
@@ -17,17 +18,19 @@ const fmtSEK = (n: number) =>
 const fmtInt = (n: number) =>
   new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(n)
 
-const COLUMNS: { key: Metric; label: string; format: (v: number) => string }[] = [
-  { key: 'net_sales', label: 'Net Sales', format: fmtSEK },
-  { key: 'gross_sales', label: 'Gross Sales', format: fmtSEK },
-  { key: 'units', label: 'Units', format: fmtInt },
-  { key: 'orders', label: 'Orders', format: fmtInt },
-  { key: 'discounts', label: 'Discounts', format: fmtSEK },
-]
-
 export function TopProductsTable({ rows, loading, sortBy, onSortByChange }: TopProductsTableProps) {
-  if (loading) return <div className="table-placeholder">Loading…</div>
-  if (!rows.length) return <div className="table-placeholder">No products found.</div>
+  const { t } = useTranslation()
+
+  const COLUMNS: { key: Metric; label: string; format: (v: number) => string }[] = [
+    { key: 'net_sales', label: t.netSales, format: fmtSEK },
+    { key: 'gross_sales', label: t.grossSales, format: fmtSEK },
+    { key: 'units', label: t.units, format: fmtInt },
+    { key: 'orders', label: t.orders, format: fmtInt },
+    { key: 'discounts', label: t.discounts, format: fmtSEK },
+  ]
+
+  if (loading) return <div className="table-placeholder">{t.loading}</div>
+  if (!rows.length) return <div className="table-placeholder">{t.noProducts}</div>
 
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -35,8 +38,8 @@ export function TopProductsTable({ rows, loading, sortBy, onSortByChange }: TopP
         <thead>
           <tr>
             <th className="num">#</th>
-            <th>Product</th>
-            <th>Category</th>
+            <th>{t.colProduct}</th>
+            <th>{t.colCategory}</th>
             {COLUMNS.map((col) => (
               <th
                 key={col.key}
@@ -48,7 +51,7 @@ export function TopProductsTable({ rows, loading, sortBy, onSortByChange }: TopP
                   userSelect: 'none',
                   whiteSpace: 'nowrap',
                 }}
-                title={`Sort by ${col.label}`}
+                title={t.sortBy(col.label)}
               >
                 {col.label}{sortBy === col.key ? ' ↓' : ''}
               </th>

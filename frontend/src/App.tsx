@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DashboardPage } from './features/dashboard/DashboardPage'
+import { LanguageProvider } from './i18n/LanguageContext'
+import { ThemeProvider } from './i18n/ThemeContext'
 import './App.css'
 
 const queryClient = new QueryClient({
@@ -13,9 +15,13 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <DashboardPage />
-    </QueryClientProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <QueryClientProvider client={queryClient}>
+          <DashboardPage />
+        </QueryClientProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   )
 }
 

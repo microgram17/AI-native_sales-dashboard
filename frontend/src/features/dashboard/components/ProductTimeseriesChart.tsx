@@ -14,14 +14,7 @@ import {
   longToWide,
 } from './visualizationUtils'
 import type { Grain, Metric, ProductSelectorItem, TimeseriesRow } from '../../../types/dashboard'
-
-const METRIC_LABELS: Record<Metric, string> = {
-  net_sales: 'Net Sales',
-  gross_sales: 'Gross Sales',
-  units: 'Units',
-  orders: 'Orders',
-  discounts: 'Discounts',
-}
+import { useTranslation } from '../../../i18n/LanguageContext'
 
 interface ProductTimeseriesChartProps {
   rows: TimeseriesRow[]
@@ -45,7 +38,15 @@ export function ProductTimeseriesChart({
   onGrainChange,
   onMetricChange,
   onProductsChange,
-}: ProductTimeseriesChartProps) {
+}: ProductTimeseriesChartProps) {  const { t } = useTranslation()
+
+  const metricLabels: Record<Metric, string> = {
+    net_sales: t.netSales,
+    gross_sales: t.grossSales,
+    units: t.units,
+    orders: t.orders,
+    discounts: t.discounts,
+  }
   function toggleProduct(id: string) {
     if (selectedProductIds.includes(id)) {
       onProductsChange(selectedProductIds.filter((p) => p !== id))
@@ -60,7 +61,7 @@ export function ProductTimeseriesChart({
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
         {/* Grain toggle */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>Grain</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>{t.grain}</span>
           <div style={{ display: 'flex', gap: '0.25rem' }}>
             {(['month', 'week'] as Grain[]).map((g) => (
               <button
@@ -76,7 +77,7 @@ export function ProductTimeseriesChart({
                   cursor: 'pointer',
                 }}
               >
-                {g.charAt(0).toUpperCase() + g.slice(1)}
+                {g === 'month' ? t.grainMonth : t.grainWeek}
               </button>
             ))}
           </div>
@@ -84,7 +85,7 @@ export function ProductTimeseriesChart({
 
         {/* Metric selector */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>Metric</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>{t.metric}</span>
           <select
             value={metric}
             onChange={(e) => onMetricChange(e.target.value as Metric)}
@@ -98,7 +99,7 @@ export function ProductTimeseriesChart({
               cursor: 'pointer',
             }}
           >
-            {(Object.entries(METRIC_LABELS) as [Metric, string][]).map(([key, label]) => (
+            {(Object.entries(metricLabels) as [Metric, string][]).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
@@ -109,7 +110,7 @@ export function ProductTimeseriesChart({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minWidth: '160px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>
-                Products {selectedProductIds.length > 0 ? `(${selectedProductIds.length} selected)` : '(top 5)'}
+                {selectedProductIds.length > 0 ? t.productsSelected(selectedProductIds.length) : t.productsTop5}
               </span>
               {selectedProductIds.length > 0 && (
                 <button
@@ -124,7 +125,7 @@ export function ProductTimeseriesChart({
                     cursor: 'pointer',
                   }}
                 >
-                  Clear
+                  {t.clearSelection}
                 </button>
               )}
             </div>
@@ -171,12 +172,12 @@ export function ProductTimeseriesChart({
 
       {/* Chart */}
       {loading ? (
-        <div className="chart-placeholder">Loading…</div>
+        <div className="chart-placeholder">{t.loading}</div>
       ) : !rows.length ? (
-        <div className="chart-placeholder">No timeseries data available.</div>
+        <div className="chart-placeholder">{t.noTimeseriesData}</div>
       ) : (() => {
         const { wideData, seriesValues } = longToWide(rows as unknown as Record<string, unknown>[], 'period', 'product_name', 'value')
-        if (!wideData.length) return <div className="chart-placeholder">No timeseries data available.</div>
+        if (!wideData.length) return <div className="chart-placeholder">{t.noTimeseriesData}</div>
         return (
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={wideData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>

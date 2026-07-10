@@ -7,6 +7,7 @@ import {
   Tooltip,
 } from 'recharts'
 import { COLORS, formatShortNumber, formatTooltipValue } from './visualizationUtils'
+import { useTranslation } from '../../../i18n/LanguageContext'
 
 interface StoreBreakdownChartProps {
   rows: Array<Record<string, unknown>>
@@ -14,8 +15,10 @@ interface StoreBreakdownChartProps {
 }
 
 export function StoreBreakdownChart({ rows, loading }: StoreBreakdownChartProps) {
-  if (loading) return <div className="chart-placeholder">Loading…</div>
-  if (!rows.length) return <div className="chart-placeholder">No store breakdown data available.</div>
+  const { t } = useTranslation()
+
+  if (loading) return <div className="chart-placeholder">{t.loading}</div>
+  if (!rows.length) return <div className="chart-placeholder">{t.noStoreData}</div>
 
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -35,7 +38,7 @@ export function StoreBreakdownChart({ rows, loading }: StoreBreakdownChartProps)
         <Tooltip formatter={(v) => formatTooltipValue(v)} />
         <Bar
           dataKey="value"
-          name="Net Sales"
+          name={t.netSales}
           fill={COLORS[0]}
           radius={[3, 3, 0, 0]}
         />
