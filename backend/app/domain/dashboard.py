@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.domain.analytics import Dimension, Metric, ResultIntent
 from app.domain.tool_result import ColumnSpec, DataQuality, ToolResultPayload, VisualizationSpec
 
 
@@ -32,9 +33,9 @@ class DashboardArtifact(BaseModel):
 
     # Optional metadata from agent-oriented tools — ignored by existing dashboard consumers.
     applied_filters: dict[str, Any] = Field(default_factory=dict)
-    primary_metric: str | None = None
-    dimension: str | None = None
-    result_intent: str | None = None
+    primary_metric: Metric | None = None
+    dimension: Dimension | None = None
+    result_intent: ResultIntent | None = None
 
     @classmethod
     def from_tool_result(cls, source_tool: str, payload: ToolResultPayload) -> "DashboardArtifact":

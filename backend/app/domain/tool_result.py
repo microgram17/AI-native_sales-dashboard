@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.domain.analytics import Dimension, Metric, ResultIntent
+
 
 class ColumnSpec(BaseModel):
     key: str
@@ -41,6 +43,6 @@ class ToolResultPayload(BaseModel):
     # Optional metadata fields — mirrors mcp_server ToolResult.
     # Ignored by existing dashboard consumers; used by agent-oriented tools.
     applied_filters: dict[str, Any] = Field(default_factory=dict)
-    primary_metric: str | None = None
-    dimension: str | None = None
-    result_intent: str | None = None  # "single_winner" | "ranking" | "timeseries" | "breakdown"
+    primary_metric: Metric | None = None
+    dimension: Dimension | None = None
+    result_intent: ResultIntent | None = None

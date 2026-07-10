@@ -9,12 +9,12 @@ from app.adapters.outbound.agent.agent_result_utils import (
     compact_summary,
 )
 from app.adapters.outbound.agent.sales_agent.tool_context import SalesToolContext
-from app.adapters.outbound.agent.sales_agent.tool_types import (
+from app.domain.analytics import (
     ALLOWED_METRICS,
-    ChannelLiteral,
-    GrainLiteral,
-    GroupByLiteral,
-    MetricLiteral,
+    Channel,
+    Grain,
+    GroupBy,
+    Metric,
 )
 
 # Maps ADK tool function name → MCP-compatible source_tool name used in artifacts.
@@ -67,8 +67,8 @@ def create_sales_tools(ctx: SalesToolContext) -> list[Callable]:
     async def get_product_timeseries(
         date_from: str | None = None,
         date_to: str | None = None,
-        metric: MetricLiteral = "net_sales",
-        grain: GrainLiteral = "month",
+        metric: Metric = "net_sales",
+        grain: Grain = "month",
         limit: int = 5,
     ) -> dict[str, Any]:
         """Get retail sell-through trends for top products over time (line chart).
@@ -115,7 +115,7 @@ def create_sales_tools(ctx: SalesToolContext) -> list[Callable]:
     async def get_top_products(
         date_from: str | None = None,
         date_to: str | None = None,
-        sort_by: MetricLiteral = "net_sales",
+        sort_by: Metric = "net_sales",
         limit: int = 10,
     ) -> dict[str, Any]:
         """Get top performing products ranked by a retail sell-through metric (product ranking/leaderboard).
@@ -159,8 +159,8 @@ def create_sales_tools(ctx: SalesToolContext) -> list[Callable]:
     async def get_store_breakdown(
         date_from: str | None = None,
         date_to: str | None = None,
-        metric: MetricLiteral = "net_sales",
-        group_by: GroupByLiteral = "store",
+        metric: Metric = "net_sales",
+        group_by: GroupBy = "store",
     ) -> dict[str, Any]:
         """Get retail sell-through performance broken down by store, city, or channel.
 
@@ -205,11 +205,11 @@ def create_sales_tools(ctx: SalesToolContext) -> list[Callable]:
     async def get_ranked_products(
         date_from: str | None = None,
         date_to: str | None = None,
-        metric: MetricLiteral = "net_sales",
+        metric: Metric = "net_sales",
         limit: int = 10,
         city: str | None = None,
         store_id: str | None = None,
-        channel: ChannelLiteral | None = None,
+        channel: Channel | None = None,
         category: str | None = None,
     ) -> dict[str, Any]:
         """Rank products by a retail sell-through metric with optional dimension filters.
@@ -272,8 +272,8 @@ def create_sales_tools(ctx: SalesToolContext) -> list[Callable]:
     async def get_ranked_locations(
         date_from: str | None = None,
         date_to: str | None = None,
-        metric: MetricLiteral = "net_sales",
-        group_by: GroupByLiteral = "store",
+        metric: Metric = "net_sales",
+        group_by: GroupBy = "store",
         limit: int = 10,
         category: str | None = None,
         product_id: str | None = None,
