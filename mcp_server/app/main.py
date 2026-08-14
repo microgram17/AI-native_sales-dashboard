@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from app.context.supplier_context import build_supplier_context_resolver
 from app.db.engine import get_engine
-from app.repositories.sales_query_repository import SalesQueryRepository
-from app.tools.sales_query_tools import register_sales_query_tools
+from app.repositories.sales_analytics_repository import SalesAnalyticsRepository
+from app.services.sales_analytics_service import SalesAnalyticsService
+from app.tools.sales_tools import register_sales_tools
 
 # Keep this only if you added the Windows asyncio helper.
 # It is harmless on Linux if the helper checks sys.platform == "win32".
@@ -24,8 +26,11 @@ mcp = FastMCP(
     port=8000,
 )
 
-sales_query_repository = SalesQueryRepository(get_engine())
-register_sales_query_tools(mcp, sales_query_repository)
+_repository = SalesAnalyticsRepository(get_engine())
+_service = SalesAnalyticsService(_repository)
+_supplier_resolver = build_supplier_context_resolver()
+
+register_sales_tools(mcp, _service, _supplier_resolver)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,19 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5433/retail_bi"
     sql_echo: bool = False
 
+    # Runtime environment. Only "development" permits the dev supplier fallback.
+    environment: str = "development"
+    # Dev-only trusted supplier. Intentionally has NO production default;
+    # set it in mcp_server/.env (see .env.example) for local development.
+    mcp_dev_supplier_id: str | None = None
+
+    # Shared secret/claims for verifying the backend-issued MCP context token.
+    # The placeholder is a non-production dev default; override via env.
+    mcp_jwt_secret: str = "dev-mcp-shared-secret-change-me-please"
+    mcp_jwt_algorithm: str = "HS256"
+    mcp_jwt_issuer: str = "retail-bi-backend"
+    mcp_jwt_audience: str = "retail-bi-mcp"
+
 
 @lru_cache
 def get_settings() -> Settings:

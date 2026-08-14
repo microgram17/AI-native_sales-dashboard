@@ -1,35 +1,29 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import type { DashboardArtifact } from '../../types/dashboard'
-import { sendChatMessage } from '../../api/chat'
+import type { ChatEntry } from '../../types/agent'
+import { queryAgent } from '../../api/agent'
 import { ChatMessage } from './ChatMessage'
 import { useTranslation } from '../../i18n/LanguageContext'
-
-interface ChatEntry {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  artifacts?: DashboardArtifact[]
-}
 
 export function ChatPanel() {
   const { t } = useTranslation()
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [input, setInput] = useState('')
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const mutation = useMutation({
-    mutationFn: sendChatMessage,
+    mutationFn: queryAgent,
     onSuccess: (data) => {
-      setSessionId(data.session_id)
+      setConversationId(data.conversation_id)
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: data.assistant_message,
-          artifacts: data.artifacts,
+          content: data.message,
+          visualizations: data.visualizations,
+          datasets: data.datasets,
         },
       ])
     },
@@ -48,11 +42,46 @@ export function ChatPanel() {
       ...prev,
       { id: crypto.randomUUID(), role: 'user', content: text },
     ])
-    mutation.mutate({ session_id: sessionId, message: text })
+    mutation.mutate({ message: text, conversation_id: conversationId })
+  }
+
+  function handleNewConversation() {
+    if (mutation.isPending) return
+    setMessages([])
+    setConversationId(null)
+    mutation.reset()
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '560px' }}>
+      {/* Toolbar */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          padding: '0.4rem 1rem',
+          borderBottom: '1px solid var(--border, #334155)',
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleNewConversation}
+          disabled={mutation.isPending || messages.length === 0}
+          style={{
+            padding: '0.3rem 0.75rem',
+            borderRadius: '6px',
+            border: '1px solid var(--border, #334155)',
+            background: 'transparent',
+            color: 'inherit',
+            fontSize: '0.8rem',
+            cursor: mutation.isPending || messages.length === 0 ? 'not-allowed' : 'pointer',
+            opacity: mutation.isPending || messages.length === 0 ? 0.5 : 1,
+          }}
+        >
+          {t.newConversation}
+        </button>
+      </div>
+
       {/* Message list */}
       <div
         style={{
@@ -80,7 +109,8 @@ export function ChatPanel() {
             key={msg.id}
             role={msg.role}
             content={msg.content}
-            artifacts={msg.artifacts}
+            visualizations={msg.visualizations}
+            datasets={msg.datasets}
           />
         ))}
         {mutation.isPending && (
@@ -102,6 +132,7 @@ export function ChatPanel() {
       {/* Error banner */}
       {mutation.isError && (
         <div
+          role="alert"
           style={{
             padding: '0.5rem 1rem',
             fontSize: '0.8rem',

@@ -11,6 +11,8 @@ from sqlalchemy import (
     Numeric,
     Table,
     Text,
+    TIMESTAMP,
+    text,
 )
 
 from sales_db.metadata import metadata
@@ -122,9 +124,65 @@ order_items = Table(
     ),
 )
 
+app_users = Table(
+    "app_users",
+    metadata,
+    Column("user_id", Text, primary_key=True),
+    Column("auth_subject", Text, nullable=False, unique=True),
+    Column("email", Text, nullable=False),
+    Column("display_name", Text),
+    Column("active", Boolean, nullable=False, server_default="true"),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")),
+    Column("updated_at", TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")),
+)
+
+supplier_memberships = Table(
+    "supplier_memberships",
+    metadata,
+    Column(
+        "user_id",
+        Text,
+        ForeignKey("app_users.user_id", onupdate="CASCADE", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "supplier_id",
+        Text,
+        ForeignKey("suppliers.supplier_id", onupdate="CASCADE", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
+    Column("role", Text, nullable=False),
+    Column("active", Boolean, nullable=False, server_default="true"),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")),
+    CheckConstraint("role IN ('admin', 'analyst', 'viewer')", name="role_valid"),
+)
+
 Index("idx_orders_order_date", orders.c.order_date)
 Index("idx_orders_store_id", orders.c.store_id)
 Index("idx_products_supplier_id", products.c.supplier_id)
 Index("idx_products_category", products.c.category)
 Index("idx_order_items_order_id", order_items.c.order_id)
 Index("idx_order_items_product_id", order_items.c.product_id)
+Index("idx_app_users_auth_subject", app_users.c.auth_subject)
+Index("idx_supplier_memberships_user_id", supplier_memberships.c.user_id)
+Index("idx_supplier_memberships_supplier_id", supplier_memberships.c.supplier_id)
+
+
+dim_date = Table(
+    "dim_date",
+    metadata,
+    Column("date_key", Date, primary_key=True),
+    Column("calendar_year", Integer, nullable=False),
+    Column("calendar_quarter", Integer, nullable=False),
+    Column("calendar_month", Integer, nullable=False),
+    Column("month_name", Text, nullable=False),
+    Column("month_start", Date, nullable=False),
+    Column("month_end", Date, nullable=False),
+    Column("quarter_start", Date, nullable=False),
+    Column("quarter_end", Date, nullable=False),
+    Column("iso_year", Integer, nullable=False),
+    Column("iso_week", Integer, nullable=False),
+    Column("week_start", Date, nullable=False),
+    Column("week_end", Date, nullable=False),
+    Column("is_weekend", Boolean, nullable=False),
+)

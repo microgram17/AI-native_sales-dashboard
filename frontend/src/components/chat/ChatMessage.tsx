@@ -1,13 +1,14 @@
-import type { DashboardArtifact } from '../../types/dashboard'
-import { ChatArtifactRenderer } from './ChatArtifactRenderer'
+import type { Dataset, VisualizationSpec } from '../../types/agent'
+import { VisualizationRenderer } from '../visualizations/VisualizationRenderer'
 
 interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
-  artifacts?: DashboardArtifact[]
+  visualizations?: VisualizationSpec[]
+  datasets?: Dataset[]
 }
 
-export function ChatMessage({ role, content, artifacts }: ChatMessageProps) {
+export function ChatMessage({ role, content, visualizations, datasets }: ChatMessageProps) {
   if (role === 'user') {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
@@ -41,15 +42,14 @@ export function ChatMessage({ role, content, artifacts }: ChatMessageProps) {
           alignSelf: 'flex-start',
           maxWidth: '90%',
           wordBreak: 'break-word',
+          whiteSpace: 'pre-wrap',
         }}
       >
         {content}
       </div>
-      {artifacts && artifacts.length > 0 && (
-        <div style={{ maxWidth: '90%' }}>
-          {artifacts.map((artifact, i) => (
-            <ChatArtifactRenderer key={i} artifact={artifact} />
-          ))}
+      {visualizations && visualizations.length > 0 && (
+        <div style={{ width: '100%', maxWidth: '640px' }}>
+          <VisualizationRenderer visualizations={visualizations} datasets={datasets ?? []} />
         </div>
       )}
     </div>

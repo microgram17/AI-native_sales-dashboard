@@ -1,42 +1,12 @@
-export interface DashboardUser {
-  user_id: string
-  display_name: string
-  supplier_id: string
-}
+export type Metric =
+  | 'net_sales'
+  | 'gross_sales'
+  | 'units'
+  | 'orders'
+  | 'discounts'
 
-export interface KpiCardData {
-  key: string
-  label: string
-  value: number
-  unit: string | null
-}
-
-export interface DashboardArtifact {
-  source_tool: string
-  result_type: string
-  title: string
-  description?: string
-  columns: Array<Record<string, unknown>>
-  rows: Array<Record<string, unknown>>
-  recommended_visualizations?: Array<Record<string, unknown>>
-  data_quality?: Record<string, unknown>
-  primary_metric?: string
-  dimension?: string
-  result_intent?: string
-}
-
-export interface DashboardResponse {
-  user: DashboardUser
-  cards: KpiCardData[]
-  artifacts: DashboardArtifact[]
-}
-
-// --- Shared types ---
-
-export type Metric = 'net_sales' | 'gross_sales' | 'units' | 'orders' | 'discounts'
 export type Grain = 'week' | 'month'
-
-// --- Widget endpoint response types ---
+export type StoreGroupBy = 'store' | 'city' | 'channel'
 
 export interface SummaryResponse {
   date_from: string | null
@@ -97,4 +67,18 @@ export interface ProductsResponse {
   date_from: string | null
   date_to: string | null
   products: ProductSelectorItem[]
+}
+
+export interface StoreBreakdownRow {
+  group_id: string
+  group_name: string
+  value: number
+}
+
+export interface StoreBreakdownResponse {
+  date_from: string | null
+  date_to: string | null
+  metric: Metric
+  group_by: StoreGroupBy
+  rows: StoreBreakdownRow[]
 }

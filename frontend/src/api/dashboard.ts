@@ -1,10 +1,11 @@
 import { apiFetch } from './client'
 import type {
-  DashboardResponse,
   Grain,
   Metric,
   ProductsResponse,
   ProductTimeseriesResponse,
+  StoreBreakdownResponse,
+  StoreGroupBy,
   SummaryResponse,
   TopProductsResponse,
 } from '../types/dashboard'
@@ -46,18 +47,30 @@ export interface DateRangeParams {
   date_to?: string
 }
 
-export const dashboardApi = {
-  getDashboard: () => apiFetch<DashboardResponse>('/dashboard'),
+export interface StoreBreakdownParams extends DateRangeParams {
+  metric?: Metric
+  group_by?: StoreGroupBy
+}
 
+export const dashboardApi = {
   getSummary: (params: SummaryParams) =>
     apiFetch<SummaryResponse>(buildUrl('/dashboard/summary', params)),
 
   getProductTimeseries: (params: ProductTimeseriesParams) =>
-    apiFetch<ProductTimeseriesResponse>(buildUrl('/dashboard/product-timeseries', params)),
+    apiFetch<ProductTimeseriesResponse>(
+      buildUrl('/dashboard/product-timeseries', params),
+    ),
 
   getTopProducts: (params: TopProductsParams) =>
-    apiFetch<TopProductsResponse>(buildUrl('/dashboard/top-products', params)),
+    apiFetch<TopProductsResponse>(
+      buildUrl('/dashboard/top-products', params),
+    ),
 
   getProducts: (params: DateRangeParams) =>
     apiFetch<ProductsResponse>(buildUrl('/dashboard/products', params)),
+
+  getStoreBreakdown: (params: StoreBreakdownParams) =>
+    apiFetch<StoreBreakdownResponse>(
+      buildUrl('/dashboard/store-breakdown', params),
+    ),
 }

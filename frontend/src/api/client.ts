@@ -1,9 +1,28 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
-let _demoUserId: string | null = null
+// Auth token for the backend (Authorization: Bearer). For local dev this can be
+// a token from backend/scripts/create_dev_token.py, provided via VITE_AGENT_TOKEN
+// at build time or set at runtime with setAuthToken(). The frontend never sends
+// or selects supplier identity — that comes from the token on the backend.
+const TOKEN_STORAGE_KEY = 'agent_token'
 
-export function setDemoUser(userId: string): void {
-  _demoUserId = userId
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token)
+    else localStorage.removeItem(TOKEN_STORAGE_KEY)
+  } catch {
+    // localStorage unavailable (SSR/tests) — ignore.
+  }
+}
+
+export function getAuthToken(): string | null {
+  try {
+    const stored = localStorage.getItem(TOKEN_STORAGE_KEY)
+    if (stored) return stored
+  } catch {
+    // ignore
+  }
+  return (import.meta.env.VITE_AGENT_TOKEN as string | undefined) ?? null
 }
 
 export class ApiError extends Error {
@@ -21,8 +40,9 @@ export async function apiFetch<T>(
   init?: Omit<RequestInit, 'headers'>,
 ): Promise<T> {
   const headers: Record<string, string> = {}
-  if (_demoUserId) {
-    headers['X-Demo-User-Id'] = _demoUserId
+  const token = getAuthToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
   }
   if (init?.body !== undefined) {
     headers['Content-Type'] = 'application/json'

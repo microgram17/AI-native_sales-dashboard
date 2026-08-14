@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { dashboardApi } from '../../api/dashboard'
-import type { DashboardArtifact, Grain, Metric } from '../../types/dashboard'
+import type { Grain, Metric } from '../../types/dashboard'
 import { KpiCard } from './components/KpiCard'
 import { ProductTimeseriesChart } from './components/ProductTimeseriesChart'
 import { TopProductsTable } from './components/TopProductsTable'
@@ -21,13 +21,6 @@ function formatCardValue(value: number, unit: string | null): string {
   return value.toLocaleString('sv-SE', { maximumFractionDigits: 0 })
 }
 
-function findArtifact(
-  artifacts: DashboardArtifact[],
-  sourceTool: string,
-): DashboardArtifact | undefined {
-  return artifacts.find((a) => a.source_tool === sourceTool)
-}
-
 export function DashboardPage() {
   const { language, setLanguage, t } = useTranslation()
   const { theme, toggleTheme } = useTheme()
@@ -43,13 +36,6 @@ export function DashboardPage() {
 
   // Top products filter
   const [topSortBy, setTopSortBy] = useState<Metric>('net_sales')
-
-  // User context — fetched once, long stale time
-  const { data: dashboardData } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: dashboardApi.getDashboard,
-    staleTime: Infinity,
-  })
 
   // KPI summary widget
   const { data: summary, isLoading: summaryLoading } = useQuery({
@@ -91,26 +77,25 @@ export function DashboardPage() {
     queryFn: () => dashboardApi.getProducts({ date_from: dateFrom, date_to: dateTo }),
   })
 
-  // Store breakdown comes from the full /dashboard artifact (no filter for now)
-  const storeBreakdown = dashboardData
-    ? findArtifact(dashboardData.artifacts, 'get_current_supplier_store_breakdown')
-    : undefined
-
-  const user = dashboardData?.user
+  // Store breakdown follows the shared date range.
+  const { data: storeBreakdown, isLoading: storeBreakdownLoading } = useQuery({
+    queryKey: ['store-breakdown', dateFrom, dateTo],
+    queryFn: () =>
+      dashboardApi.getStoreBreakdown({
+        date_from: dateFrom,
+        date_to: dateTo,
+        metric: 'net_sales',
+        group_by: 'store',
+      }),
+  })
 
   return (
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="dashboard-title">
           <h1>{t.dashboardTitle}</h1>
-          {user && <span className="supplier-tagline">{user.supplier_id}</span>}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {user && (
-            <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>
-              {user.display_name}
-            </span>
-          )}
           <div style={{ display: 'flex', gap: '3px', alignItems: 'center', marginLeft: '0.5rem' }}>
             {/* Theme toggle */}
             <button
@@ -246,7 +231,7 @@ export function DashboardPage() {
         <h2>{t.storeBreakdown}</h2>
         <StoreBreakdownChart
           rows={storeBreakdown?.rows ?? []}
-          loading={false}
+          loading={storeBreakdownLoading}
         />
       </section>
 

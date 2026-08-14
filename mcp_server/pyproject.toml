@@ -1,7 +1,7 @@
 [project]
 name = "sales-mcp-server"
 version = "0.1.0"
-description = "Add your description here"
+description = "Domain-oriented MCP analytics server for supplier sales"
 authors = [
     { name = "Wille Kolu", email = "wille.kolu10@gmail.com" }
 ]
@@ -11,13 +11,23 @@ dependencies = [
     "psycopg[binary]>=3.0,<4.0",
     "pydantic>=2.13.0",
     "pydantic-settings>=2.0.0",
+    "pyjwt[crypto]>=2.10,<3.0",
     "python-dotenv>=1.0.0",
     "sqlalchemy>=2.0,<3.0",
 ]
 
-[project.scripts]
-sales-mcp-server = "sales_mcp_server:main"
+[tool.uv]
+# Run as `python -m app.main`, not installed as a package, so uv manages only
+# the environment (no build backend, src/, or README required).
+package = false
 
-[build-system]
-requires = ["uv_build>=0.11.25,<0.12.0"]
-build-backend = "uv_build"
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.24,<1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"

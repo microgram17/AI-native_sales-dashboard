@@ -24,6 +24,7 @@ export interface Translations {
   chatThinking: string
   chatSend: string
   chatError: string
+  newConversation: string
   // Shared states
   loading: string
   // TopProductsTable
@@ -64,6 +65,7 @@ export const translations: Record<Language, Translations> = {
     chatThinking: 'Thinking…',
     chatSend: 'Send',
     chatError: 'Request failed. Please try again.',
+    newConversation: 'New conversation',
     loading: 'Loading…',
     noProducts: 'No products found.',
     colProduct: 'Product',
@@ -98,6 +100,7 @@ export const translations: Record<Language, Translations> = {
     chatThinking: 'Tänker…',
     chatSend: 'Skicka',
     chatError: 'Förfrågan misslyckades. Försök igen.',
+    newConversation: 'Ny konversation',
     loading: 'Laddar…',
     noProducts: 'Inga produkter hittades.',
     colProduct: 'Produkt',
