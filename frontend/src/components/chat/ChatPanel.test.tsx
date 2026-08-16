@@ -6,7 +6,12 @@ import { LanguageProvider } from '../../i18n/LanguageContext'
 import type { AgentQueryResponse } from '../../types/agent'
 
 function renderChat() {
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } })
+  const client = new QueryClient({
+    defaultOptions: {
+      mutations: { retry: false },
+      queries: { retry: false },
+    },
+  })
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider>
@@ -17,7 +22,12 @@ function renderChat() {
 }
 
 function okResponse(data: AgentQueryResponse) {
-  return { ok: true, status: 200, json: async () => data, text: async () => '' } as Response
+  return {
+    ok: true,
+    status: 200,
+    json: async () => data,
+    text: async () => '',
+  } as Response
 }
 
 function submit(text: string) {
@@ -31,6 +41,7 @@ const baseResponse: AgentQueryResponse = {
   message: 'Winner is Hoodie.',
   tool_calls: [],
   datasets: [],
+  visualization_datasets: [],
   visualizations: [],
 }
 
@@ -55,6 +66,7 @@ describe('ChatPanel', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(String(url)).toContain('/agent/query')
     expect(init.method).toBe('POST')
+
     const body = JSON.parse(init.body)
     expect(body.message).toBe('best product?')
     expect(body.conversation_id).toBeNull()
@@ -67,6 +79,7 @@ describe('ChatPanel', () => {
     submit('turn 1')
     await screen.findByText('Winner is Hoodie.')
     submit('turn 2')
+
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body)
     expect(secondBody.conversation_id).toBe('conv-1')
@@ -76,32 +89,57 @@ describe('ChatPanel', () => {
     renderChat()
     submit('turn 1')
     await screen.findByText('Winner is Hoodie.')
-    fireEvent.click(screen.getByRole('button', { name: /konversation|conversation/i }))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /konversation|conversation/i }),
+    )
     submit('fresh start')
+
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     const body = JSON.parse(fetchMock.mock.calls[1][1].body)
     expect(body.conversation_id).toBeNull()
   })
 
-  it('renders assistant text and visualizations from the response', async () => {
+  it('renders assistant text and normalized visualizations from the response', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse({
         ...baseResponse,
         message: 'Here is the ranking.',
-        datasets: [
-          { call_id: 'c1', tool_name: 'sales_rank', status: 'success', result: { rows: [{ entity: { name: 'Hoodie' }, metrics: { units: 40 } }] } },
+        visualization_datasets: [
+          {
+            id: 'c1:ranking',
+            source_call_id: 'c1',
+            view: 'ranking',
+            rows: [{ entity_name: 'Hoodie', units: 40 }],
+          },
         ],
-        visualizations: [{ dataset: 'c1', type: 'bar_chart', title: 'Top products', y_keys: ['units'] }],
+        visualizations: [
+          {
+            dataset: 'c1:ranking',
+            type: 'bar_chart',
+            title: 'Top products',
+            x_key: 'entity_name',
+            y_keys: ['units'],
+            columns: [],
+          },
+        ],
       }),
     )
+
     renderChat()
     submit('rank')
+
     expect(await screen.findByText('Here is the ranking.')).toBeInTheDocument()
     expect(screen.getByText('Top products')).toBeInTheDocument()
   })
 
   it('shows an error state when the request fails', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'boom' } as Response)
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => 'boom',
+    } as Response)
+
     renderChat()
     submit('will fail')
     expect(await screen.findByRole('alert')).toBeInTheDocument()
@@ -109,14 +147,23 @@ describe('ChatPanel', () => {
 
   it('prevents duplicate submission while a request is in flight', async () => {
     let resolveFetch: (r: Response) => void = () => {}
-    fetchMock.mockImplementationOnce(() => new Promise<Response>((r) => { resolveFetch = r }))
+
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve
+        }),
+    )
+
     renderChat()
     submit('slow one')
+
     const input = screen.getByRole('textbox') as HTMLInputElement
     await waitFor(() => expect(input).toBeDisabled())
-    // Attempt a second submit while pending.
+
     fireEvent.submit(input.closest('form')!)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+
     resolveFetch(okResponse(baseResponse))
     await screen.findByText('Winner is Hoodie.')
   })

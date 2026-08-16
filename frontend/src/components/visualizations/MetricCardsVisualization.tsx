@@ -1,10 +1,14 @@
-import type { VisualizationSpec, Dataset } from '../../types/agent'
-import { datasetToRows, resolveField, pickValueKeys } from '../../lib/datasetResolver'
+import type { VisualizationDataset, VisualizationSpec } from '../../types/agent'
+import {
+  datasetToRows,
+  numericFieldExists,
+  resolveField,
+} from '../../lib/datasetResolver'
 import { formatMetricValue, humanizeKey } from '../../lib/format'
 
 interface Props {
   spec: VisualizationSpec
-  dataset: Dataset
+  dataset: VisualizationDataset
 }
 
 export function MetricCardsVisualization({ spec, dataset }: Props) {
@@ -12,19 +16,32 @@ export function MetricCardsVisualization({ spec, dataset }: Props) {
   const row = rows[0]
   if (!row) return <Fallback />
 
-  const keys = spec.y_keys.length ? spec.y_keys : pickValueKeys(rows)
-  const usable = keys.filter((k) => resolveField(row, k) !== undefined)
+  const usable = spec.y_keys.filter(
+    (key) =>
+      numericFieldExists(rows, key) &&
+      resolveField(row, key) !== undefined,
+  )
   if (usable.length === 0) return <Fallback />
 
-  const caption = (resolveField(row, 'name') as string | undefined) ?? undefined
+  const caption =
+    (resolveField(row, 'product_name') as string | undefined) ??
+    (resolveField(row, 'entity_name') as string | undefined) ??
+    undefined
 
   return (
     <div>
       {caption && (
-        <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginBottom: '0.4rem' }}>
+        <div
+          style={{
+            fontSize: '0.8rem',
+            color: 'var(--muted)',
+            marginBottom: '0.4rem',
+          }}
+        >
           {caption}
         </div>
       )}
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         {usable.map((key) => (
           <div
@@ -38,7 +55,13 @@ export function MetricCardsVisualization({ spec, dataset }: Props) {
               border: '1px solid var(--border, #334155)',
             }}
           >
-            <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginBottom: '0.2rem' }}>
+            <div
+              style={{
+                fontSize: '0.7rem',
+                color: 'var(--muted)',
+                marginBottom: '0.2rem',
+              }}
+            >
               {humanizeKey(key)}
             </div>
             <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>

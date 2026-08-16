@@ -23,7 +23,7 @@ export function ChatPanel() {
           role: 'assistant',
           content: data.message,
           visualizations: data.visualizations,
-          datasets: data.datasets,
+          visualizationDatasets: data.visualization_datasets,
         },
       ])
     },
@@ -37,6 +37,7 @@ export function ChatPanel() {
     e.preventDefault()
     const text = input.trim()
     if (!text || mutation.isPending) return
+
     setInput('')
     setMessages((prev) => [
       ...prev,
@@ -54,7 +55,6 @@ export function ChatPanel() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '560px' }}>
-      {/* Toolbar */}
       <div
         style={{
           display: 'flex',
@@ -82,7 +82,6 @@ export function ChatPanel() {
         </button>
       </div>
 
-      {/* Message list */}
       <div
         style={{
           flex: 1,
@@ -104,15 +103,17 @@ export function ChatPanel() {
             {t.chatEmpty}
           </div>
         )}
+
         {messages.map((msg) => (
           <ChatMessage
             key={msg.id}
             role={msg.role}
             content={msg.content}
             visualizations={msg.visualizations}
-            datasets={msg.datasets}
+            visualizationDatasets={msg.visualizationDatasets}
           />
         ))}
+
         {mutation.isPending && (
           <div
             style={{
@@ -126,10 +127,10 @@ export function ChatPanel() {
             {t.chatThinking}
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
 
-      {/* Error banner */}
       {mutation.isError && (
         <div
           role="alert"
@@ -145,7 +146,6 @@ export function ChatPanel() {
         </div>
       )}
 
-      {/* Input bar */}
       <form
         onSubmit={handleSubmit}
         style={{

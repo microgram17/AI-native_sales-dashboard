@@ -137,7 +137,10 @@ def register_sales_tools(
         - period_start / period_end: inclusive range; supply both or neither.
           If omitted, the full available range is used.
         - scope: optional filters; empty lists mean no restriction.
-        - limit: number of ranked rows, 1–20 (default 10).
+        - limit: number of ranked rows, 1–20 (default 10). For a singular
+          winner/loser question, pass limit=1. For an explicit top/bottom N
+          question, pass limit=N. Do not rely on the default when the requested
+          cardinality is explicit.
 
         Returns: SalesRankingResult with ranked rows (entity, metrics, share,
         change), the rank_by total across the complete eligible population, the
@@ -145,9 +148,12 @@ def register_sales_tools(
 
         Examples:
         - "What is our best-selling product online?" (group_by=product,
-          rank_by=units, scope={"channels":["online"]}).
-        - "Which stores sell the least?" (group_by=store, rank_by=net_sales,
-          order="lowest").
+          rank_by=units, scope={"channels":["online"]}, limit=1,
+          order="highest").
+        - "Which store has the lowest net sales?" (group_by=store,
+          rank_by=net_sales, limit=1, order="lowest").
+        - "What are our top 5 products by revenue?" (group_by=product,
+          rank_by=net_sales, limit=5, order="highest").
         """
         supplier_id = supplier_resolver.resolve(ctx)
         return await _run(

@@ -1,38 +1,43 @@
-import type { VisualizationSpec, Dataset } from '../../types/agent'
-import { datasetToRows, resolveField } from '../../lib/datasetResolver'
+import type { VisualizationDataset, VisualizationSpec } from '../../types/agent'
+import {
+  datasetToRows,
+  fieldExists,
+  resolveField,
+} from '../../lib/datasetResolver'
 import { formatMetricValue, humanizeKey } from '../../lib/format'
 
 interface Props {
   spec: VisualizationSpec
-  dataset: Dataset
+  dataset: VisualizationDataset
 }
 
-export function TableVisualization({ dataset }: Props) {
+export function TableVisualization({ spec, dataset }: Props) {
   const rows = datasetToRows(dataset)
   if (rows.length === 0) {
-    return (
-      <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>No rows to display.</div>
-    )
+    return <Fallback text="No rows to display." />
   }
 
-  // Columns = scalar fields of the widest row (skip nested objects kept for dot-paths).
-  const columns = Array.from(
-    rows.reduce<Set<string>>((acc, row) => {
-      for (const [k, v] of Object.entries(row)) {
-        if (v == null || typeof v !== 'object') acc.add(k)
-      }
-      return acc
-    }, new Set<string>()),
+  const columns = spec.columns.filter((column) =>
+    fieldExists(rows, column),
   )
+  if (columns.length === 0) {
+    return <Fallback text="No valid table columns were provided." />
+  }
 
   return (
     <div style={{ overflowX: 'auto', maxHeight: '360px' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: '0.8rem',
+        }}
+      >
         <thead>
           <tr>
-            {columns.map((c) => (
+            {columns.map((column) => (
               <th
-                key={c}
+                key={column}
                 style={{
                   padding: '0.4rem 0.6rem',
                   textAlign: 'left',
@@ -45,7 +50,7 @@ export function TableVisualization({ dataset }: Props) {
                   background: 'var(--surface, #1e293b)',
                 }}
               >
-                {humanizeKey(c)}
+                {humanizeKey(column)}
               </th>
             ))}
           </tr>
@@ -53,13 +58,22 @@ export function TableVisualization({ dataset }: Props) {
         <tbody>
           {rows.map((row, i) => (
             <tr key={i}>
-              {columns.map((c) => {
-                const value = resolveField(row, c)
-                const display = typeof value === 'number' ? formatMetricValue(c, value) : String(value ?? '')
+              {columns.map((column) => {
+                const value = resolveField(row, column)
+                const display =
+                  typeof value === 'number'
+                    ? formatMetricValue(column, value)
+                    : String(value ?? '')
+
                 return (
                   <td
-                    key={c}
-                    style={{ padding: '0.35rem 0.6rem', borderBottom: '1px solid rgba(51,65,85,0.4)', whiteSpace: 'nowrap' }}
+                    key={column}
+                    style={{
+                      padding: '0.35rem 0.6rem',
+                      borderBottom:
+                        '1px solid rgba(51,65,85,0.4)',
+                      whiteSpace: 'nowrap',
+                    }}
                   >
                     {display}
                   </td>
@@ -69,6 +83,14 @@ export function TableVisualization({ dataset }: Props) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function Fallback({ text }: { text: string }) {
+  return (
+    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+      {text}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from 'react'
-import type { Dataset, VisualizationSpec } from '../../types/agent'
+import type { VisualizationDataset, VisualizationSpec } from '../../types/agent'
 import { findDataset } from '../../lib/datasetResolver'
 import { MetricCardsVisualization } from './MetricCardsVisualization'
 import { BarChartVisualization } from './BarChartVisualization'
@@ -8,24 +8,44 @@ import { TableVisualization } from './TableVisualization'
 
 interface RendererProps {
   visualizations: VisualizationSpec[]
-  datasets: Dataset[]
+  datasets: VisualizationDataset[]
 }
 
-// Renders every VisualizationSpec the backend returned. The frontend does not
-// choose chart types — it renders whatever shape the backend selected.
-export function VisualizationRenderer({ visualizations, datasets }: RendererProps) {
+export function VisualizationRenderer({
+  visualizations,
+  datasets,
+}: RendererProps) {
   if (!visualizations || visualizations.length === 0) return null
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.6rem' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        marginTop: '0.6rem',
+      }}
+    >
       {visualizations.map((spec, i) => (
-        <VisualizationCard key={`${spec.dataset}-${i}`} spec={spec} datasets={datasets} />
+        <VisualizationCard
+          key={`${spec.dataset}-${i}`}
+          spec={spec}
+          datasets={datasets}
+        />
       ))}
     </div>
   )
 }
 
-function VisualizationCard({ spec, datasets }: { spec: VisualizationSpec; datasets: Dataset[] }) {
+function VisualizationCard({
+  spec,
+  datasets,
+}: {
+  spec: VisualizationSpec
+  datasets: VisualizationDataset[]
+}) {
   const dataset = findDataset(datasets, spec.dataset)
+
   return (
     <div
       style={{
@@ -35,10 +55,18 @@ function VisualizationCard({ spec, datasets }: { spec: VisualizationSpec; datase
         background: 'rgba(30,41,59,0.4)',
       }}
     >
-      <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>{spec.title}</div>
+      <div
+        style={{
+          fontSize: '0.85rem',
+          fontWeight: 600,
+          marginBottom: '0.5rem',
+        }}
+      >
+        {spec.title}
+      </div>
       <VizBoundary>
         {!dataset ? (
-          <FallbackNote text={`No dataset "${spec.dataset}" to visualize.`} />
+          <FallbackNote text={`No visualization dataset "${spec.dataset}".`} />
         ) : (
           <VisualizationBody spec={spec} dataset={dataset} />
         )}
@@ -47,7 +75,13 @@ function VisualizationCard({ spec, datasets }: { spec: VisualizationSpec; datase
   )
 }
 
-function VisualizationBody({ spec, dataset }: { spec: VisualizationSpec; dataset: Dataset }) {
+function VisualizationBody({
+  spec,
+  dataset,
+}: {
+  spec: VisualizationSpec
+  dataset: VisualizationDataset
+}) {
   switch (spec.type) {
     case 'metric_cards':
       return <MetricCardsVisualization spec={spec} dataset={dataset} />
@@ -58,7 +92,7 @@ function VisualizationBody({ spec, dataset }: { spec: VisualizationSpec; dataset
     case 'table':
       return <TableVisualization spec={spec} dataset={dataset} />
     default:
-      return <TableVisualization spec={spec} dataset={dataset} />
+      return <FallbackNote text="Unsupported visualization type." />
   }
 }
 
@@ -66,14 +100,20 @@ function FallbackNote({ text }: { text: string }) {
   return <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>{text}</div>
 }
 
-// Keeps one broken visualization from crashing the chat.
-class VizBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+class VizBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
   state = { failed: false }
+
   static getDerivedStateFromError() {
     return { failed: true }
   }
+
   render() {
-    if (this.state.failed) return <FallbackNote text="This visualization could not be rendered." />
+    if (this.state.failed) {
+      return <FallbackNote text="This visualization could not be rendered." />
+    }
     return this.props.children
   }
 }

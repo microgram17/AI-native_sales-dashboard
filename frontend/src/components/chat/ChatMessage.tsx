@@ -1,14 +1,22 @@
-import type { Dataset, VisualizationSpec } from '../../types/agent'
+import type {
+  VisualizationDataset,
+  VisualizationSpec,
+} from '../../types/agent'
 import { VisualizationRenderer } from '../visualizations/VisualizationRenderer'
 
 interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
   visualizations?: VisualizationSpec[]
-  datasets?: Dataset[]
+  visualizationDatasets?: VisualizationDataset[]
 }
 
-export function ChatMessage({ role, content, visualizations, datasets }: ChatMessageProps) {
+export function ChatMessage({
+  role,
+  content,
+  visualizations,
+  visualizationDatasets,
+}: ChatMessageProps) {
   if (role === 'user') {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
@@ -47,9 +55,13 @@ export function ChatMessage({ role, content, visualizations, datasets }: ChatMes
       >
         {content}
       </div>
+
       {visualizations && visualizations.length > 0 && (
         <div style={{ width: '100%', maxWidth: '640px' }}>
-          <VisualizationRenderer visualizations={visualizations} datasets={datasets ?? []} />
+          <VisualizationRenderer
+            visualizations={visualizations}
+            datasets={visualizationDatasets ?? []}
+          />
         </div>
       )}
     </div>

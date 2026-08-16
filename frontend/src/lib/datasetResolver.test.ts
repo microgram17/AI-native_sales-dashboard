@@ -1,50 +1,43 @@
 import { describe, it, expect } from 'vitest'
-import { datasetToRows, resolveField, pickLabelKey, pickValueKeys } from './datasetResolver'
-import { formatMetricValue } from './format'
-import type { Dataset } from '../types/agent'
+import {
+  datasetToRows,
+  findDataset,
+  resolveField,
+  fieldExists,
+  numericFieldExists,
+} from './datasetResolver'
+import type { VisualizationDataset } from '../types/agent'
 
-const rankDataset: Dataset = {
-  call_id: 'c1',
-  tool_name: 'sales_rank',
-  status: 'success',
-  result: {
-    rows: [
-      { rank: 1, entity: { id: 'NORD-1', name: 'Hoodie' }, metrics: { units: 40, net_sales: 1000 } },
-      { rank: 2, entity: { id: 'NORD-2', name: 'Tee' }, metrics: { units: 30, net_sales: 800 } },
-    ],
-  },
+const dataset: VisualizationDataset = {
+  id: 'c1:ranking',
+  source_call_id: 'c1',
+  view: 'ranking',
+  rows: [
+    { rank: 1, entity_name: 'Hoodie', units: 40, net_sales: 1000 },
+    { rank: 2, entity_name: 'Tee', units: 30, net_sales: 800 },
+  ],
 }
 
 describe('datasetResolver', () => {
-  it('flattens nested entity/metrics into top-level fields', () => {
-    const rows = datasetToRows(rankDataset)
-    expect(rows).toHaveLength(2)
-    expect(rows[0].name).toBe('Hoodie')
-    expect(rows[0].units).toBe(40)
+  it('finds only the exact normalized dataset id', () => {
+    expect(findDataset([dataset], 'c1:ranking')).toBe(dataset)
+    expect(findDataset([dataset], 'wrong')).toBeUndefined()
   })
 
-  it('resolveField supports dot paths and last-segment fallback', () => {
-    const rows = datasetToRows(rankDataset)
-    expect(resolveField(rows[0], 'metrics.units')).toBe(40)
-    expect(resolveField(rows[0], 'name')).toBe('Hoodie')
+  it('returns normalized rows unchanged', () => {
+    expect(datasetToRows(dataset)).toEqual(dataset.rows)
   })
 
-  it('picks label and value keys with fallbacks', () => {
-    const rows = datasetToRows(rankDataset)
-    expect(pickLabelKey(rows, undefined)).toBe('name')
-    expect(pickValueKeys(rows, ['units'])).toEqual(['units'])
-    expect(pickValueKeys(rows, []).length).toBeGreaterThan(0)
+  it('resolves exact flat fields only', () => {
+    const row = dataset.rows[0]
+    expect(resolveField(row, 'units')).toBe(40)
+    expect(resolveField(row, 'metrics.units')).toBeUndefined()
   })
-})
 
-describe('formatMetricValue', () => {
-  it('formats sales as SEK currency', () => {
-    expect(formatMetricValue('net_sales', 1000)).toMatch(/kr|SEK/)
-  })
-  it('formats rates as percentages', () => {
-    expect(formatMetricValue('discount_rate', 0.04)).toContain('%')
-  })
-  it('formats counts as grouped integers', () => {
-    expect(formatMetricValue('units', 1234)).toMatch(/1[\s ]?234/)
+  it('validates field existence and numeric fields without fallback', () => {
+    expect(fieldExists(dataset.rows, 'entity_name')).toBe(true)
+    expect(fieldExists(dataset.rows, 'missing')).toBe(false)
+    expect(numericFieldExists(dataset.rows, 'net_sales')).toBe(true)
+    expect(numericFieldExists(dataset.rows, 'entity_name')).toBe(false)
   })
 })

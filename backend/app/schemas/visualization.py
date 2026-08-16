@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,16 +12,28 @@ VisualizationType = Literal[
 ]
 
 
-class VisualizationSpec(BaseModel):
-    """Advisory rendering hint for one tool result. It carries no MCP or backend
-    business logic; the frontend decides how to render it."""
+class VisualizationDataset(BaseModel):
+    """Flat, deterministic rows prepared specifically for visualization."""
 
-    dataset: str = Field(description="call_id of the tool result this visualizes.")
+    id: str = Field(description="Stable visualization dataset id, e.g. 'c1:ranking'.")
+    source_call_id: str = Field(description="call_id of the MCP tool result this view came from.")
+    view: str = Field(description="Semantic view name, e.g. current, comparison, ranking or trend.")
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class VisualizationSpec(BaseModel):
+    """Rendering instruction over one normalized VisualizationDataset."""
+
+    dataset: str = Field(description="VisualizationDataset.id to render.")
     type: VisualizationType
     title: str
     x_key: str | None = None
     y_keys: list[str] = Field(default_factory=list)
     series_key: str | None = None
+    columns: list[str] = Field(
+        default_factory=list,
+        description="Exact columns to render for table visualizations.",
+    )
 
 
 class VisualizationPlan(BaseModel):

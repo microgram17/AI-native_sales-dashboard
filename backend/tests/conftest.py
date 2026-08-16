@@ -96,7 +96,7 @@ def transport_failure() -> McpClientError:
 
 def rank_plan_args() -> dict[str, Any]:
     return {"group_by": "product", "rank_by": "units", "period_start": "2026-01-01",
-            "period_end": "2026-08-12", "order": "highest", "limit": 10}
+            "period_end": "2026-08-12", "order": "highest", "limit": 1}
 
 
 def rank_plan_call() -> dict[str, Any]:
@@ -115,15 +115,32 @@ def make_router_node(route: str = "new_data", reason: str = "test"):
     return router
 
 
-def make_planner_node(tool_calls: list[dict] | None = None, *, vary: Callable[[int], list[dict]] | None = None,
-                      capture: dict | None = None):
+def make_planner_node(
+    tool_calls: list[dict] | None = None,
+    *,
+    vary: Callable[[int], list[dict]] | None = None,
+    capture: dict | None = None,
+    inherit_period: bool = False,
+    inherit_scope: bool = False,
+    inherit_entity: bool = False,
+    inherit_operation: bool = False,
+):
     @node
     def planner(ctx: Context) -> None:
         calls = ctx.state.get("_planner_calls", 0) + 1
         ctx.state["_planner_calls"] = calls
         if capture is not None:
-            capture["prior_context_summary"] = ctx.state.get(StateKeys.PRIOR_CONTEXT_SUMMARY, "")
-        ctx.state[StateKeys.TOOL_PLAN] = {"tool_calls": vary(calls) if vary else (tool_calls or [])}
+            capture["prior_context_summary"] = ctx.state.get(
+                StateKeys.PRIOR_CONTEXT_SUMMARY,
+                "",
+            )
+        ctx.state[StateKeys.TOOL_PLAN] = {
+            "tool_calls": vary(calls) if vary else (tool_calls or []),
+            "inherit_period": inherit_period,
+            "inherit_scope": inherit_scope,
+            "inherit_entity": inherit_entity,
+            "inherit_operation": inherit_operation,
+        }
 
     return planner
 

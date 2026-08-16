@@ -1,15 +1,20 @@
-// Types mirroring the backend agent contract (app/schemas/agent.py + visualization.py).
-// The backend is the source of truth; the frontend never sends supplier identity.
-
 export type VisualizationType = 'metric_cards' | 'bar_chart' | 'line_chart' | 'table'
 
 export interface VisualizationSpec {
-  dataset: string // call_id of the dataset this visualizes
+  dataset: string
   type: VisualizationType
   title: string
   x_key?: string | null
   y_keys: string[]
   series_key?: string | null
+  columns: string[]
+}
+
+export interface VisualizationDataset {
+  id: string
+  source_call_id: string
+  view: string
+  rows: Record<string, unknown>[]
 }
 
 export interface ToolCallInfo {
@@ -21,7 +26,6 @@ export interface ToolCallInfo {
   error?: string | null
 }
 
-// Generic JSON dataset at the API boundary; narrowed in renderer helpers.
 export interface Dataset {
   call_id: string
   tool_name: string
@@ -39,14 +43,14 @@ export interface AgentQueryResponse {
   message: string
   tool_calls: ToolCallInfo[]
   datasets: Dataset[]
+  visualization_datasets: VisualizationDataset[]
   visualizations: VisualizationSpec[]
 }
 
-// UI-side representation of one chat turn.
 export interface ChatEntry {
   id: string
   role: 'user' | 'assistant'
   content: string
   visualizations?: VisualizationSpec[]
-  datasets?: Dataset[]
+  visualizationDatasets?: VisualizationDataset[]
 }

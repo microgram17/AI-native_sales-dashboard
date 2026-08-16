@@ -6,11 +6,12 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts'
+import type { StoreBreakdownRow } from '../../../types/dashboard'
 import { COLORS, formatShortNumber, formatTooltipValue } from './visualizationUtils'
 import { useTranslation } from '../../../i18n/LanguageContext'
 
 interface StoreBreakdownChartProps {
-  rows: Array<Record<string, unknown>>
+  rows: StoreBreakdownRow[]
   loading: boolean
 }
 
