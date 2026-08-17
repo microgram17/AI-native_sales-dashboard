@@ -1,6 +1,7 @@
 import type {
   VisualizationDataset,
   VisualizationSpec,
+  ToolCallInfo,
 } from '../../types/agent'
 import { VisualizationRenderer } from '../visualizations/VisualizationRenderer'
 
@@ -9,6 +10,7 @@ interface ChatMessageProps {
   content: string
   visualizations?: VisualizationSpec[]
   visualizationDatasets?: VisualizationDataset[]
+  toolCalls?: ToolCallInfo[]
 }
 
 export function ChatMessage({
@@ -16,6 +18,7 @@ export function ChatMessage({
   content,
   visualizations,
   visualizationDatasets,
+  toolCalls,
 }: ChatMessageProps) {
   if (role === 'user') {
     return (
@@ -52,6 +55,7 @@ export function ChatMessage({
             <VisualizationRenderer
               visualizations={visualizations}
               datasets={visualizationDatasets ?? []}
+              toolCalls={toolCalls ?? []}
             />
           </div>
         )}

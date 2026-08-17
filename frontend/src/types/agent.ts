@@ -61,4 +61,5 @@ export interface ChatEntry {
   content: string
   visualizations?: VisualizationSpec[]
   visualizationDatasets?: VisualizationDataset[]
+  toolCalls?: ToolCallInfo[]
 }

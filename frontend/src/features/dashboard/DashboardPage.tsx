@@ -7,9 +7,11 @@ import { ProductTimeseriesChart } from './components/ProductTimeseriesChart'
 import { TopProductsTable } from './components/TopProductsTable'
 import { StoreBreakdownChart } from './components/StoreBreakdownChart'
 import { ChatPanel } from '../../components/chat/ChatPanel'
+import { ExportableRegion } from '../../components/export/ExportableRegion'
+import type { ExportColumn, ExportFilter } from '../../lib/export/exportTypes'
+import { visualizationFieldLabel } from '../../i18n/translations'
 import { useTranslation } from '../../i18n/LanguageContext'
 import { useTheme } from '../../i18n/ThemeContext'
-import { useAuth } from '../auth/AuthContext'
 
 function formatCardValue(value: number, unit: string | null): string {
   if (unit === 'SEK') {
@@ -25,7 +27,6 @@ function formatCardValue(value: number, unit: string | null): string {
 export function DashboardPage() {
   const { language, setLanguage, t } = useTranslation()
   const { theme, toggleTheme } = useTheme()
-  const { user, logout } = useAuth()
 
   // Shared date range
   const [dateFrom, setDateFrom] = useState('2025-07-01')
@@ -91,23 +92,119 @@ export function DashboardPage() {
       }),
   })
 
+
+  const metricLabels: Record<Metric, string> = {
+    net_sales: t.netSales,
+    gross_sales: t.grossSales,
+    units: t.unitsSold,
+    orders: t.orders,
+    discounts: t.discounts,
+  }
+
+  const sharedFilters: ExportFilter[] = [
+    { label: t.dateFrom, value: dateFrom },
+    { label: t.dateTo, value: dateTo },
+  ]
+
+  const summaryRows: Record<string, unknown>[] = summary
+    ? [
+        {
+          net_sales: summary.net_sales,
+          gross_sales: summary.gross_sales,
+          units: summary.units,
+          orders: summary.orders,
+        },
+      ]
+    : []
+
+  const summaryColumns: ExportColumn[] = [
+    { key: 'net_sales', label: t.netSales },
+    { key: 'gross_sales', label: t.grossSales },
+    { key: 'units', label: t.unitsSold },
+    { key: 'orders', label: t.orders },
+  ]
+
+  const selectedProductNames =
+    selectedProductIds.length > 0
+      ? (productsData?.products ?? [])
+          .filter((product) => selectedProductIds.includes(product.product_id))
+          .map((product) => product.product_name)
+      : [t.exportTopProducts]
+
+  const timeseriesColumns: ExportColumn[] = [
+    {
+      key: 'period',
+      label: visualizationFieldLabel(language, 'period'),
+    },
+    {
+      key: 'product_id',
+      label: visualizationFieldLabel(language, 'product_id'),
+    },
+    {
+      key: 'product_name',
+      label: visualizationFieldLabel(language, 'product_name'),
+    },
+    {
+      key: 'category',
+      label: visualizationFieldLabel(language, 'category'),
+    },
+    {
+      key: 'value',
+      label: metricLabels[metric],
+    },
+  ]
+
+  const timeseriesFilters: ExportFilter[] = [
+    ...sharedFilters,
+    { label: t.grain, value: grain === 'month' ? t.grainMonth : t.grainWeek },
+    { label: t.metric, value: metricLabels[metric] },
+    {
+      label: visualizationFieldLabel(language, 'product_ids'),
+      value: selectedProductNames,
+    },
+  ]
+
+  const topProductColumns: ExportColumn[] = [
+    { key: 'rank', label: visualizationFieldLabel(language, 'rank') },
+    { key: 'product_id', label: visualizationFieldLabel(language, 'product_id') },
+    { key: 'product_name', label: t.colProduct },
+    { key: 'category', label: t.colCategory },
+    { key: 'net_sales', label: t.netSales },
+    { key: 'gross_sales', label: t.grossSales },
+    { key: 'units', label: t.unitsSold },
+    { key: 'orders', label: t.orders },
+    { key: 'discounts', label: t.discounts },
+  ]
+
+  const topProductFilters: ExportFilter[] = [
+    ...sharedFilters,
+    { label: t.exportSortedBy, value: metricLabels[topSortBy] },
+    { label: visualizationFieldLabel(language, 'limit'), value: 10 },
+  ]
+
+  const storeColumns: ExportColumn[] = [
+    { key: 'group_id', label: visualizationFieldLabel(language, 'store_id') },
+    { key: 'group_name', label: visualizationFieldLabel(language, 'store_name') },
+    { key: 'value', label: t.netSales },
+  ]
+
+  const storeFilters: ExportFilter[] = [
+    ...sharedFilters,
+    { label: t.metric, value: t.netSales },
+    {
+      label: visualizationFieldLabel(language, 'group_by'),
+      value: visualizationFieldLabel(language, 'store_name'),
+    },
+  ]
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="dashboard-title">
           <h1>{t.dashboardTitle}</h1>
         </div>
-        <div className="dashboard-actions">
-          <div className="dashboard-account">
-            <span className="dashboard-account-name">
-              {user?.display_name ?? user?.email ?? user?.user_id}
-            </span>
-            <button className="logout-button" onClick={logout}>
-              {t.logout}
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '3px', alignItems: 'center', marginLeft: '0.5rem' }}>
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
@@ -196,24 +293,37 @@ export function DashboardPage() {
       </div>
 
       {/* KPI cards */}
-      <section className="kpi-grid">
-        {summary ? (
-          <>
-            <KpiCard label={t.netSales} value={formatCardValue(summary.net_sales, 'SEK')} loading={summaryLoading} />
-            <KpiCard label={t.grossSales} value={formatCardValue(summary.gross_sales, 'SEK')} loading={summaryLoading} />
-            <KpiCard label={t.unitsSold} value={formatCardValue(summary.units, null)} loading={summaryLoading} />
-            <KpiCard label={t.orders} value={formatCardValue(summary.orders, null)} loading={summaryLoading} />
-          </>
-        ) : (
-          Array.from({ length: 4 }).map((_, i) => (
-            <KpiCard key={i} label="—" value="…" loading={true} />
-          ))
-        )}
-      </section>
+      <ExportableRegion
+        className="dashboard-summary-region"
+        title={t.salesSummary}
+        rows={summaryRows}
+        columns={summaryColumns}
+        filters={sharedFilters}
+      >
+        <div className="kpi-grid">
+          {summary ? (
+            <>
+              <KpiCard label={t.netSales} value={formatCardValue(summary.net_sales, 'SEK')} loading={summaryLoading} />
+              <KpiCard label={t.grossSales} value={formatCardValue(summary.gross_sales, 'SEK')} loading={summaryLoading} />
+              <KpiCard label={t.unitsSold} value={formatCardValue(summary.units, null)} loading={summaryLoading} />
+              <KpiCard label={t.orders} value={formatCardValue(summary.orders, null)} loading={summaryLoading} />
+            </>
+          ) : (
+            Array.from({ length: 4 }).map((_, i) => (
+              <KpiCard key={i} label="—" value="…" loading={true} />
+            ))
+          )}
+        </div>
+      </ExportableRegion>
 
       <div className="dashboard-grid">
-        <section className="panel">
-          <h2>{t.productRevenueTrend}</h2>
+        <ExportableRegion
+          className="panel"
+          title={t.productRevenueTrend}
+          rows={(timeseries?.rows ?? []) as unknown as Record<string, unknown>[]}
+          columns={timeseriesColumns}
+          filters={timeseriesFilters}
+        >
           <ProductTimeseriesChart
             rows={timeseries?.rows ?? []}
             loading={timeseriesLoading}
@@ -225,26 +335,36 @@ export function DashboardPage() {
             onMetricChange={setMetric}
             onProductsChange={setSelectedProductIds}
           />
-        </section>
+        </ExportableRegion>
 
-        <section className="panel">
-          <h2>{t.topProducts}</h2>
+        <ExportableRegion
+          className="panel"
+          title={t.topProducts}
+          rows={(topProducts?.rows ?? []) as unknown as Record<string, unknown>[]}
+          columns={topProductColumns}
+          filters={topProductFilters}
+        >
           <TopProductsTable
             rows={topProducts?.rows ?? []}
             loading={topLoading}
             sortBy={topSortBy}
             onSortByChange={setTopSortBy}
           />
-        </section>
+        </ExportableRegion>
       </div>
 
-      <section className="panel">
-        <h2>{t.storeBreakdown}</h2>
+      <ExportableRegion
+        className="panel"
+        title={t.storeBreakdown}
+        rows={(storeBreakdown?.rows ?? []) as unknown as Record<string, unknown>[]}
+        columns={storeColumns}
+        filters={storeFilters}
+      >
         <StoreBreakdownChart
           rows={storeBreakdown?.rows ?? []}
           loading={storeBreakdownLoading}
         />
-      </section>
+      </ExportableRegion>
 
       <section className="panel" style={{ marginTop: '1.5rem' }}>
         <h2>{t.chat}</h2>

@@ -63,6 +63,20 @@ export interface Translations {
   vizUnsupported: string
   vizRenderError: string
   vizMissingDataset: (dataset: string) => string
+  // Export
+  export: string
+  exporting: string
+  exportExcel: string
+  exportCsv: string
+  exportPng: string
+  exportFailed: string
+  exportDataSheet: string
+  exportFiltersSheet: string
+  exportFilter: string
+  exportValue: string
+  salesSummary: string
+  exportTopProducts: string
+  exportSortedBy: string
 }
 
 export const translations: Record<Language, Translations> = {
@@ -119,6 +133,19 @@ export const translations: Record<Language, Translations> = {
     vizUnsupported: 'Unsupported visualization type.',
     vizRenderError: 'This visualization could not be rendered.',
     vizMissingDataset: (dataset) => `No visualization dataset "${dataset}".`,
+    export: 'Export',
+    exporting: 'Exporting…',
+    exportExcel: 'Excel (.xlsx)',
+    exportCsv: 'CSV (.csv)',
+    exportPng: 'PNG image',
+    exportFailed: 'Export failed.',
+    exportDataSheet: 'Data',
+    exportFiltersSheet: 'Filters',
+    exportFilter: 'Filter',
+    exportValue: 'Value',
+    salesSummary: 'Sales Summary',
+    exportTopProducts: 'Top 5 products',
+    exportSortedBy: 'Sorted by',
   },
   sv: {
     dashboardTitle: 'Leverantörspanel',
@@ -173,6 +200,19 @@ export const translations: Record<Language, Translations> = {
     vizUnsupported: 'Visualiseringstypen stöds inte.',
     vizRenderError: 'Visualiseringen kunde inte renderas.',
     vizMissingDataset: (dataset) => `Visualiseringsdata "${dataset}" saknas.`,
+    export: 'Exportera',
+    exporting: 'Exporterar…',
+    exportExcel: 'Excel (.xlsx)',
+    exportCsv: 'CSV (.csv)',
+    exportPng: 'PNG-bild',
+    exportFailed: 'Exporten misslyckades.',
+    exportDataSheet: 'Data',
+    exportFiltersSheet: 'Filter',
+    exportFilter: 'Filter',
+    exportValue: 'Värde',
+    salesSummary: 'Försäljningsöversikt',
+    exportTopProducts: 'Topp 5 produkter',
+    exportSortedBy: 'Sorterat efter',
   },
 }
 
@@ -206,6 +246,20 @@ const visualizationFieldLabels: Record<Language, Record<string, string>> = {
     rank_metric_percent_change: 'Percent change',
     total_population_rank_metric_value: 'Population total',
     returned_rows_rank_metric_value: 'Displayed rows total',
+    value: 'Value',
+    period_end: 'Period end',
+    group_by: 'Group by',
+    rank_by: 'Rank by',
+    split_by: 'Split by',
+    grain: 'Grain',
+    limit: 'Limit',
+    series_limit: 'Series limit',
+    order: 'Order',
+    channels: 'Channels',
+    cities: 'Cities',
+    store_ids: 'Stores',
+    categories: 'Categories',
+    product_ids: 'Products',
   },
   sv: {
     rank: 'Placering',
@@ -235,6 +289,20 @@ const visualizationFieldLabels: Record<Language, Record<string, string>> = {
     rank_metric_percent_change: 'Procentuell förändring',
     total_population_rank_metric_value: 'Totalt för populationen',
     returned_rows_rank_metric_value: 'Totalt för visade rader',
+    value: 'Värde',
+    period_end: 'Periodslut',
+    group_by: 'Gruppera efter',
+    rank_by: 'Rangordna efter',
+    split_by: 'Dela upp efter',
+    grain: 'Granularitet',
+    limit: 'Antal',
+    series_limit: 'Max antal serier',
+    order: 'Ordning',
+    channels: 'Kanaler',
+    cities: 'Städer',
+    store_ids: 'Butiker',
+    categories: 'Kategorier',
+    product_ids: 'Produkter',
   },
 }
 
@@ -242,10 +310,32 @@ const visualizationValueLabels: Record<Language, Record<string, string>> = {
   en: {
     online: 'Online',
     physical: 'Physical',
+    day: 'Day',
+    week: 'Week',
+    month: 'Month',
+    quarter: 'Quarter',
+    product: 'Product',
+    category: 'Category',
+    store: 'Store',
+    city: 'City',
+    channel: 'Channel',
+    highest: 'Highest',
+    lowest: 'Lowest',
   },
   sv: {
     online: 'Online',
     physical: 'Fysisk',
+    day: 'Dag',
+    week: 'Vecka',
+    month: 'Månad',
+    quarter: 'Kvartal',
+    product: 'Produkt',
+    category: 'Kategori',
+    store: 'Butik',
+    city: 'Stad',
+    channel: 'Kanal',
+    highest: 'Högst',
+    lowest: 'Lägst',
   },
 }
 

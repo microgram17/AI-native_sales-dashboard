@@ -24,6 +24,7 @@ export function ChatPanel() {
           content: data.message,
           visualizations: data.visualizations,
           visualizationDatasets: data.visualization_datasets,
+          toolCalls: data.tool_calls,
         },
       ])
     },
@@ -115,6 +116,7 @@ export function ChatPanel() {
             content={msg.content}
             visualizations={msg.visualizations}
             visualizationDatasets={msg.visualizationDatasets}
+            toolCalls={msg.toolCalls}
           />
         ))}
 

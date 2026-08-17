@@ -638,3 +638,152 @@ html.dark .login-error {
     display: none;
   }
 }
+
+
+/* == Export controls == */
+.exportable-region-header,
+.visualization-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.exportable-region-header {
+  margin-bottom: 18px;
+}
+
+.exportable-region-header h2,
+.visualization-card-header .visualization-title {
+  margin: 0;
+}
+
+.dashboard-summary-region {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-summary-region .exportable-region-header {
+  margin-bottom: 10px;
+}
+
+.dashboard-summary-region .exportable-region-header h2 {
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+.visualization-card-header {
+  margin-bottom: 10px;
+}
+
+.visualization-card-header .visualization-title {
+  flex: 1;
+}
+
+.export-control {
+  position: relative;
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.export-menu {
+  position: relative;
+}
+
+.export-menu > summary {
+  list-style: none;
+}
+
+.export-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.export-menu-trigger:hover {
+  color: var(--text-h);
+  border-color: var(--accent-border);
+}
+
+.export-menu[open] .export-menu-trigger {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+.export-menu-chevron {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.export-menu-popover {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  min-width: 145px;
+  flex-direction: column;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--viz-tooltip-bg, var(--bg));
+  box-shadow: var(--shadow);
+}
+
+.export-menu-popover button {
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-h);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.export-menu-popover button:hover:not(:disabled) {
+  background: var(--accent-bg);
+}
+
+.export-menu-popover button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.export-error {
+  display: block;
+  margin-top: 4px;
+  color: #dc2626;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+html.dark .export-error {
+  color: #fca5a5;
+}
+
+@media (max-width: 640px) {
+  .exportable-region-header,
+  .visualization-card-header {
+    gap: 8px;
+  }
+
+  .export-menu-trigger {
+    padding: 4px 6px;
+  }
+}
