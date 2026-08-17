@@ -29,6 +29,13 @@ class VisualizationSpec(BaseModel):
     title: str
     x_key: str | None = None
     y_keys: list[str] = Field(default_factory=list)
+    secondary_y_keys: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Subset of y_keys rendered on the secondary/right Y axis. "
+            "Used only by line_chart visualizations."
+        ),
+    )
     series_key: str | None = None
     columns: list[str] = Field(
         default_factory=list,

@@ -1,27 +1,38 @@
-import type { VisualizationDataset, VisualizationSpec } from '../../types/agent'
+import type {
+  VisualizationDataset,
+  VisualizationSpec,
+} from '../../types/agent'
 import {
   datasetToRows,
   numericFieldExists,
   resolveField,
 } from '../../lib/datasetResolver'
-import { formatMetricValue, humanizeKey } from '../../lib/format'
+import { formatMetricValue } from '../../lib/format'
+import { useTranslation } from '../../i18n/LanguageContext'
+import { visualizationFieldLabel } from '../../i18n/translations'
 
 interface Props {
   spec: VisualizationSpec
   dataset: VisualizationDataset
 }
 
-export function MetricCardsVisualization({ spec, dataset }: Props) {
+export function MetricCardsVisualization({
+  spec,
+  dataset,
+}: Props) {
+  const { language, t } = useTranslation()
   const rows = datasetToRows(dataset)
   const row = rows[0]
-  if (!row) return <Fallback />
+
+  if (!row) return <Fallback text={t.vizNoMetrics} />
 
   const usable = spec.y_keys.filter(
     (key) =>
       numericFieldExists(rows, key) &&
       resolveField(row, key) !== undefined,
   )
-  if (usable.length === 0) return <Fallback />
+
+  if (usable.length === 0) return <Fallback text={t.vizNoMetrics} />
 
   const caption =
     (resolveField(row, 'product_name') as string | undefined) ??
@@ -31,41 +42,25 @@ export function MetricCardsVisualization({ spec, dataset }: Props) {
   return (
     <div>
       {caption && (
-        <div
-          style={{
-            fontSize: '0.8rem',
-            color: 'var(--muted)',
-            marginBottom: '0.4rem',
-          }}
-        >
+        <div className="visualization-caption">
           {caption}
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div className="visualization-metric-grid">
         {usable.map((key) => (
           <div
             key={key}
-            style={{
-              flex: '1 1 120px',
-              minWidth: '120px',
-              padding: '0.6rem 0.75rem',
-              borderRadius: '8px',
-              background: 'rgba(51,65,85,0.35)',
-              border: '1px solid var(--border, #334155)',
-            }}
+            className="visualization-metric-card"
           >
-            <div
-              style={{
-                fontSize: '0.7rem',
-                color: 'var(--muted)',
-                marginBottom: '0.2rem',
-              }}
-            >
-              {humanizeKey(key)}
+            <div className="visualization-metric-label">
+              {visualizationFieldLabel(language, key)}
             </div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>
-              {formatMetricValue(key, resolveField(row, key))}
+            <div className="visualization-metric-value">
+              {formatMetricValue(
+                key,
+                resolveField(row, key),
+              )}
             </div>
           </div>
         ))}
@@ -74,10 +69,10 @@ export function MetricCardsVisualization({ spec, dataset }: Props) {
   )
 }
 
-function Fallback() {
+function Fallback({ text }: { text: string }) {
   return (
-    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-      No metrics available to display.
+    <div className="visualization-fallback">
+      {text}
     </div>
   )
 }

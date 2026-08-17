@@ -55,6 +55,14 @@ export interface Translations {
   noTimeseriesData: string
   // StoreBreakdownChart
   noStoreData: string
+  // Agent visualizations
+  vizNoMetrics: string
+  vizNoChartData: string
+  vizNoRows: string
+  vizNoValidColumns: string
+  vizUnsupported: string
+  vizRenderError: string
+  vizMissingDataset: (dataset: string) => string
 }
 
 export const translations: Record<Language, Translations> = {
@@ -104,6 +112,13 @@ export const translations: Record<Language, Translations> = {
     clearSelection: 'Clear',
     noTimeseriesData: 'No timeseries data available.',
     noStoreData: 'No store breakdown data available.',
+    vizNoMetrics: 'No metrics available to display.',
+    vizNoChartData: 'No valid data to chart.',
+    vizNoRows: 'No rows to display.',
+    vizNoValidColumns: 'No valid table columns were provided.',
+    vizUnsupported: 'Unsupported visualization type.',
+    vizRenderError: 'This visualization could not be rendered.',
+    vizMissingDataset: (dataset) => `No visualization dataset "${dataset}".`,
   },
   sv: {
     dashboardTitle: 'Leverantörspanel',
@@ -151,5 +166,108 @@ export const translations: Record<Language, Translations> = {
     clearSelection: 'Rensa',
     noTimeseriesData: 'Ingen tidsseriedata tillgänglig.',
     noStoreData: 'Ingen butiksdata tillgänglig.',
+    vizNoMetrics: 'Inga mätvärden att visa.',
+    vizNoChartData: 'Ingen giltig data att visualisera.',
+    vizNoRows: 'Inga rader att visa.',
+    vizNoValidColumns: 'Inga giltiga tabellkolumner angavs.',
+    vizUnsupported: 'Visualiseringstypen stöds inte.',
+    vizRenderError: 'Visualiseringen kunde inte renderas.',
+    vizMissingDataset: (dataset) => `Visualiseringsdata "${dataset}" saknas.`,
   },
+}
+
+
+const visualizationFieldLabels: Record<Language, Record<string, string>> = {
+  en: {
+    rank: 'Rank',
+    entity_name: 'Entity',
+    entity_type: 'Entity type',
+    product_id: 'Product ID',
+    product_name: 'Product',
+    category: 'Category',
+    store_id: 'Store ID',
+    store_name: 'Store',
+    city: 'City',
+    channel: 'Channel',
+    period: 'Period',
+    period_start: 'Period',
+    period_label: 'Period',
+    series_name: 'Series',
+    units: 'Units sold',
+    net_sales: 'Net sales',
+    gross_sales: 'Gross sales',
+    orders: 'Orders',
+    discounts: 'Discounts',
+    average_selling_price: 'Average selling price',
+    discount_rate: 'Discount rate',
+    share_of_rank_metric: 'Share of ranked metric',
+    previous_rank_metric_value: 'Previous value',
+    rank_metric_absolute_change: 'Absolute change',
+    rank_metric_percent_change: 'Percent change',
+    total_population_rank_metric_value: 'Population total',
+    returned_rows_rank_metric_value: 'Displayed rows total',
+  },
+  sv: {
+    rank: 'Placering',
+    entity_name: 'Namn',
+    entity_type: 'Typ',
+    product_id: 'Produkt-ID',
+    product_name: 'Produkt',
+    category: 'Kategori',
+    store_id: 'Butiks-ID',
+    store_name: 'Butik',
+    city: 'Stad',
+    channel: 'Kanal',
+    period: 'Period',
+    period_start: 'Period',
+    period_label: 'Period',
+    series_name: 'Serie',
+    units: 'Sålda enheter',
+    net_sales: 'Nettoomsättning',
+    gross_sales: 'Bruttoomsättning',
+    orders: 'Beställningar',
+    discounts: 'Rabatter',
+    average_selling_price: 'Genomsnittligt försäljningspris',
+    discount_rate: 'Rabattgrad',
+    share_of_rank_metric: 'Andel av rankningsmått',
+    previous_rank_metric_value: 'Föregående värde',
+    rank_metric_absolute_change: 'Absolut förändring',
+    rank_metric_percent_change: 'Procentuell förändring',
+    total_population_rank_metric_value: 'Totalt för populationen',
+    returned_rows_rank_metric_value: 'Totalt för visade rader',
+  },
+}
+
+const visualizationValueLabels: Record<Language, Record<string, string>> = {
+  en: {
+    online: 'Online',
+    physical: 'Physical',
+  },
+  sv: {
+    online: 'Online',
+    physical: 'Fysisk',
+  },
+}
+
+function fallbackHumanizeKey(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+export function visualizationFieldLabel(
+  language: Language,
+  key: string,
+): string {
+  return visualizationFieldLabels[language][key] ?? fallbackHumanizeKey(key)
+}
+
+export function visualizationValueLabel(
+  language: Language,
+  value: unknown,
+): unknown {
+  if (typeof value !== 'string') return value
+
+  const translated = visualizationValueLabels[language][value.toLowerCase()]
+  return translated ?? value
 }

@@ -7,26 +7,47 @@ from google.adk.models.lite_llm import LiteLlm
 
 from app.schemas.visualization import VisualizationPlan
 
+
 _INSTRUCTION = """You plan visualizations for a supplier sales analytics assistant.
 
 User question: {user_message}
+UI language: {ui_language}
 Available visualization datasets (JSON): {visualization_datasets_json}
 
 Each dataset already contains flat, chart-ready rows. Use only dataset IDs and
 field names that actually appear in the supplied datasets.
 
-Rules:
+UI LANGUAGE
+- The UI language value is authoritative for ALL user-facing visualization titles.
+- If UI language is 'sv', write every visualization title in natural Swedish.
+- If UI language is 'en', write every visualization title in natural English.
+- This rule applies regardless of the language used in the user's question.
+- Dataset IDs, field names, x_key, y_keys, secondary_y_keys, series_key, and
+  columns are technical contract values and MUST remain unchanged; never translate
+  those keys.
+- Keep titles concise business labels rather than full sentences.
+
+CORE RULES
 - Every analytical response with a meaningful visualization dataset MUST return
   at least one visualization.
-- Prefer one primary visualization unless a rule below explicitly requires more.
+- If the user explicitly asks to graph, chart, plot, visualize, or show a trend,
+  you MUST return at least one valid visualization whenever a suitable dataset
+  exists. Never return an empty plan merely because requested metrics use
+  different units.
+- Prefer one primary visualization unless the user's request genuinely requires
+  multiple charts.
 - Return zero visualizations only when no supplied dataset can be visualized
   meaningfully.
+- Use only the metrics relevant to the user's question. Do not add every numeric
+  field merely because it is available.
 
 GENERAL SUMMARY
 - For a general sales-summary question, use metric_cards on the ':current'
   dataset.
 - Do not add a previous-period comparison unless the user explicitly asks for
   a comparison or comparison is central to answering the question.
+- metric_cards may contain metrics with different units because each card is an
+  independent value.
 
 SINGLE RESULT / WINNER / LOSER
 - If a ':ranking' dataset contains exactly ONE row, you MUST use metric_cards,
@@ -51,7 +72,9 @@ RANKING LISTS
   with:
     x_key='entity_name'
     y_keys=[the metric the user asked to rank or compare by]
-- Do not plot all available numeric metrics merely because they are present.
+- Keep ranking bar charts single-axis.
+- If the user explicitly asks to compare categorical metrics from different unit
+  families, use separate bar charts rather than mixing those units on one axis.
 - For "best-selling" or "worst-selling" questions, the primary metric is usually
   units unless the user explicitly specifies revenue or another metric.
 - For revenue/sales rankings, the primary metric is normally net_sales.
@@ -73,18 +96,51 @@ SINGLE-PRODUCT OVERVIEW
 TIME SERIES
 - For time-series questions, use a line_chart on the ':trend' dataset with
   x_key='period_label'.
-- Use the metric the user asked about as the y_key.
+- Use the metric or metrics the user actually asked to see.
 - Use net_sales for a general "sales over time" request unless the user
   specifies another metric.
 - Use series_key='series_name' only when that field actually exists and
   represents multiple series.
+- A split-series line chart uses one metric in y_keys. Do not combine a
+  series_key with multiple metric columns.
+
+DUAL-AXIS LINE CHARTS
+- secondary_y_keys is the subset of y_keys that should use the secondary/right
+  Y axis. Keys not in secondary_y_keys use the primary/left Y axis.
+- For a one-family time series, use a normal single-axis line chart and set
+  secondary_y_keys=[].
+- When the user asks to compare metrics from EXACTLY TWO different unit families
+  over the same time dimension, use ONE dual-axis line_chart when there is no
+  series split.
+- Preserve the user's metric order in y_keys. The first metric family's keys
+  belong to the left axis; put every key from the second metric family in
+  secondary_y_keys.
+- Examples of different metric families include:
+    units/counts vs net_sales/currency
+    orders/counts vs net_sales/currency
+    discount_rate/rate vs net_sales/currency
+- Example:
+    User asks for monthly units sold and net sales.
+    Use:
+      type='line_chart'
+      x_key='period_label'
+      y_keys=['units', 'net_sales']
+      secondary_y_keys=['net_sales']
+- Never use more than two Y-axis metric families in one chart.
+- If the user explicitly requests three or more incompatible metric families,
+  create multiple line charts grouped by compatible metric family instead of
+  returning no visualization.
+- Do not create a dual-axis chart just because extra metrics are available. It
+  is appropriate when the user asked for both metrics or comparing both is
+  necessary to answer the question.
 
 CATEGORICAL COMPARISONS
 - For channel, city, category, store, or other categorical comparisons and
   breakdowns with multiple rows, normally use a bar_chart with one meaningful
   metric.
 - Use the metric central to the user's question.
-- Do not place unrelated metrics with different units on the same chart.
+- Keep each bar chart to one unit family. If the user explicitly asks for
+  incompatible metric families, create separate bar charts.
 
 TABLES
 - Use a table when detailed row-level output is more useful than a chart.
@@ -93,10 +149,10 @@ TABLES
 FIELD AND CHART SAFETY
 - Never invent dataset IDs or field names.
 - Never invent nested field paths. All supplied fields are flat.
-- Do not mix metrics with different unit families on one bar/line axis.
-  For example, do not combine net_sales with units or discount_rate.
 - metric_cards use y_keys.
 - bar_chart and line_chart require x_key and y_keys.
+- secondary_y_keys may only contain keys also present in y_keys.
+- secondary_y_keys is only meaningful for line_chart.
 - table uses columns.
 
 Allowed types: metric_cards, bar_chart, line_chart, table.
@@ -104,7 +160,9 @@ Return a VisualizationPlan.
 """
 
 
-def build_visualization_agent(model: LiteLlm) -> LlmAgent:
+def build_visualization_agent(
+    model: LiteLlm,
+) -> LlmAgent:
     return LlmAgent(
         name="visualization",
         model=model,

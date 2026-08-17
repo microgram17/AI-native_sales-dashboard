@@ -70,6 +70,7 @@ describe('ChatPanel', () => {
     const body = JSON.parse(init.body)
     expect(body.message).toBe('best product?')
     expect(body.conversation_id).toBeNull()
+    expect(body.language).toBe('sv')
     expect(body).not.toHaveProperty('supplier_id')
     expect(body).not.toHaveProperty('supplier_code')
   })
@@ -129,8 +130,16 @@ describe('ChatPanel', () => {
     renderChat()
     submit('rank')
 
-    expect(await screen.findByText('Here is the ranking.')).toBeInTheDocument()
-    expect(screen.getByText('Top products')).toBeInTheDocument()
+    const assistantText = await screen.findByText('Here is the ranking.')
+    const visualizationTitle = screen.getByText('Top products')
+
+    expect(assistantText).toBeInTheDocument()
+    expect(visualizationTitle).toBeInTheDocument()
+    expect(
+      assistantText.closest('.message-bubble'),
+    ).toBe(
+      visualizationTitle.closest('.message-bubble'),
+    )
   })
 
   it('shows an error state when the request fails', async () => {

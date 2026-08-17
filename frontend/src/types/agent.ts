@@ -6,6 +6,11 @@ export interface VisualizationSpec {
   title: string
   x_key?: string | null
   y_keys: string[]
+  /**
+   * Subset of y_keys rendered against the secondary/right Y axis.
+   * Empty/undefined means a normal single-axis visualization.
+   */
+  secondary_y_keys?: string[]
   series_key?: string | null
   columns: string[]
 }
@@ -33,9 +38,12 @@ export interface Dataset {
   result: Record<string, unknown>
 }
 
+export type UiLanguage = 'en' | 'sv'
+
 export interface AgentQueryRequest {
   message: string
   conversation_id?: string | null
+  language: UiLanguage
 }
 
 export interface AgentQueryResponse {

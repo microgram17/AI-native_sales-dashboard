@@ -1,31 +1,4 @@
-/* ── Theme variables ───────────────────────────────────────────────────────── */
-
-/* Light (default) */
-:root {
-  --bg: #ffffff;
-  --surface: #f8fafc;
-  --border: #e2e8f0;
-  --text-h: #0f172a;
-  --text: #475569;
-  --muted: #64748b;
-  --accent: #6366f1;
-}
-
-/* Dark — toggled via html.dark class */
-html.dark {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --border: #334155;
-  --text-h: #f1f5f9;
-  --text: #94a3b8;
-  --muted: #94a3b8;
-  --accent: #818cf8;
-}
-
-html.dark body {
-  background-color: var(--bg);
-  color: var(--text);
-}
+/* Theme variables are defined centrally in index.css. */
 
 /* ── Dashboard layout ────────────────────────────────────────────────────── */
 /* == Dashboard layout == */
@@ -239,6 +212,8 @@ html.dark body {
 
 .message {
   display: flex;
+  width: 100%;
+  margin-bottom: 0.75rem;
 }
 
 .message-user {
@@ -250,30 +225,143 @@ html.dark body {
 }
 
 .message-bubble {
-  max-width: 80%;
+  box-sizing: border-box;
   padding: 10px 14px;
   border-radius: 12px;
   font-size: 14px;
   line-height: 1.5;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
 .message-user .message-bubble {
+  max-width: 75%;
   background: var(--accent);
   color: #fff;
   border-bottom-right-radius: 3px;
 }
 
 .message-assistant .message-bubble {
-  background: var(--code-bg);
+  max-width: min(92%, 780px);
+  background: var(--chat-assistant-bg);
   color: var(--text-h);
+  border: 1px solid var(--chat-assistant-border);
   border-bottom-left-radius: 3px;
 }
 
-.message-bubble.message-error {
-  background: #fff1f1;
-  color: #c0392b;
+.message-assistant .message-bubble.has-visualizations {
+  width: min(100%, 780px);
+  max-width: min(100%, 780px);
+}
+
+.assistant-message-text {
+  white-space: pre-wrap;
+}
+
+.assistant-message-visualizations {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--viz-divider);
+}
+
+/* Visualization content lives inside the assistant message bubble. */
+.visualization-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.visualization-card {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--viz-border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--viz-surface);
+  color: var(--text-h);
+}
+
+.visualization-title {
+  margin-bottom: 10px;
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.visualization-caption {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.visualization-fallback {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.visualization-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(120px, 1fr)
+  );
+  gap: 8px;
+}
+
+.visualization-metric-card {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--viz-border);
+  border-radius: 8px;
+  background: var(--viz-metric-bg);
+}
+
+.visualization-metric-label {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.visualization-metric-value {
+  color: var(--text-h);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.15px;
+}
+
+.visualization-table-wrap {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--viz-border);
+  border-radius: 8px;
+}
+
+.visualization-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.visualization-table th,
+.visualization-table td {
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--viz-border);
+  color: var(--text-h);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.visualization-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--viz-table-header);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.visualization-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 /* Typing dots */
@@ -295,6 +383,7 @@ html.dark body {
 .typing-dots span:nth-child(2) {
   animation-delay: 0.2s;
 }
+
 .typing-dots span:nth-child(3) {
   animation-delay: 0.4s;
 }
@@ -305,84 +394,10 @@ html.dark body {
   100% {
     transform: translateY(0);
   }
+
   40% {
     transform: translateY(-6px);
   }
-}
-
-/* Visualization inline */
-.message-viz {
-  margin-top: 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  padding-top: 8px;
-}
-
-/* Chart/viz container inside a message bubble */
-.viz-wrap {
-  margin-top: 4px;
-}
-
-.viz-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: inherit;
-  opacity: 0.7;
-  margin: 0 0 8px;
-}
-
-/* KPI cards */
-.viz-kpi-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.viz-kpi-card {
-  display: flex;
-  flex-direction: column;
-  background: rgba(0, 0, 0, 0.06);
-  border-radius: 6px;
-  padding: 6px 10px;
-  min-width: 110px;
-  flex: 1 1 110px;
-}
-
-.viz-kpi-label {
-  font-size: 10px;
-  opacity: 0.65;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.viz-kpi-value {
-  font-size: 15px;
-  font-weight: 700;
-  margin-top: 2px;
-}
-
-.viz-table-wrap {
-  overflow-x: auto;
-}
-
-.viz-table {
-  width: 100%;
-  font-size: 12px;
-  border-collapse: collapse;
-}
-
-.viz-table th,
-.viz-table td {
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.viz-table th {
-  font-weight: 600;
-  opacity: 0.8;
 }
 
 /* Chat input row */
@@ -393,7 +408,6 @@ html.dark body {
 
 .agent-chat-input input {
   flex: 1;
-  font-size: 14px;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -401,6 +415,7 @@ html.dark body {
   color: var(--text-h);
   outline: none;
   font-family: inherit;
+  font-size: 14px;
 }
 
 .agent-chat-input input:focus {
@@ -413,8 +428,6 @@ html.dark body {
 }
 
 .agent-chat-input button {
-  font-size: 14px;
-  font-weight: 500;
   padding: 8px 18px;
   border: none;
   border-radius: 6px;
@@ -423,6 +436,8 @@ html.dark body {
   cursor: pointer;
   transition: opacity 0.15s;
   font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .agent-chat-input button:disabled {
@@ -432,6 +447,22 @@ html.dark body {
 
 .agent-chat-input button:not(:disabled):hover {
   opacity: 0.85;
+}
+
+@media (max-width: 640px) {
+  .message-user .message-bubble {
+    max-width: 88%;
+  }
+
+  .message-assistant .message-bubble,
+  .message-assistant .message-bubble.has-visualizations {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .visualization-card {
+    padding: 10px;
+  }
 }
 
 

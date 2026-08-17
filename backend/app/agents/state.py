@@ -12,6 +12,7 @@ class StateKeys:
     SUPPLIER_ID = "supplier_id"
     ROLES = "roles"
     USER_MESSAGE = "user_message"
+    UI_LANGUAGE = "ui_language"
     CURRENT_DATE = "current_date"
     CONVERSATION_ID = "conversation_id"
 

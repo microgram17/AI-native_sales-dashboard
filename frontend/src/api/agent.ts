@@ -9,6 +9,7 @@ export function queryAgent(request: AgentQueryRequest): Promise<AgentQueryRespon
     body: JSON.stringify({
       message: request.message,
       conversation_id: request.conversation_id ?? null,
+      language: request.language,
     }),
   })
 }

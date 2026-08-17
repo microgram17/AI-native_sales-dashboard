@@ -8,7 +8,10 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import type { VisualizationDataset, VisualizationSpec } from '../../types/agent'
+import type {
+  VisualizationDataset,
+  VisualizationSpec,
+} from '../../types/agent'
 import {
   datasetToRows,
   fieldExists,
@@ -20,14 +23,106 @@ import {
   formatShortNumber,
   longToWide,
 } from '../../features/dashboard/components/visualizationUtils'
-import { formatMetricValue, humanizeKey } from '../../lib/format'
+import { formatMetricValue } from '../../lib/format'
+import { useTranslation } from '../../i18n/LanguageContext'
+import {
+  type Language,
+  visualizationFieldLabel,
+  visualizationValueLabel,
+} from '../../i18n/translations'
 
 interface Props {
   spec: VisualizationSpec
   dataset: VisualizationDataset
 }
 
-export function LineChartVisualization({ spec, dataset }: Props) {
+const PRIMARY_AXIS_ID = 'primary'
+const SECONDARY_AXIS_ID = 'secondary'
+
+function isRateKey(key: string): boolean {
+  return /(rate|share|percent)/.test(
+    key.toLowerCase(),
+  )
+}
+
+function isMonetaryKey(key: string): boolean {
+  const normalized = key.toLowerCase()
+
+  return (
+    /(sales|revenue|discount|price|sek|cost)/.test(
+      normalized,
+    ) && !isRateKey(normalized)
+  )
+}
+
+function formatAxisTick(
+  metricKey: string,
+  value: unknown,
+  language: Language,
+): string {
+  if (
+    typeof value !== 'number' ||
+    Number.isNaN(value)
+  ) {
+    return String(value ?? '')
+  }
+
+  if (isRateKey(metricKey)) {
+    const percentage =
+      Math.abs(value) <= 1 ? value * 100 : value
+
+    const locale = language === 'sv' ? 'sv-SE' : 'en-SE'
+
+    return `${new Intl.NumberFormat(locale, {
+      maximumFractionDigits: 1,
+    }).format(percentage)}%`
+  }
+
+  return formatShortNumber(value)
+}
+
+function axisLabel(
+  keys: string[],
+  language: Language,
+): string {
+  if (keys.length === 0) return ''
+
+  if (keys.length === 1) {
+    const key = keys[0]
+    const label = visualizationFieldLabel(language, key)
+
+    return isMonetaryKey(key)
+      ? `${label} (SEK)`
+      : label
+  }
+
+  if (keys.every(isMonetaryKey)) {
+    return 'SEK'
+  }
+
+  if (keys.every(isRateKey)) {
+    return language === 'sv' ? 'Procent' : 'Percent'
+  }
+
+  return keys
+    .map((key) => visualizationFieldLabel(language, key))
+    .join(' / ')
+}
+
+const axisTick = {
+  fontSize: 11,
+  fill: 'var(--viz-axis)',
+}
+
+const axisLine = {
+  stroke: 'var(--viz-axis-line)',
+}
+
+export function LineChartVisualization({
+  spec,
+  dataset,
+}: Props) {
+  const { language, t } = useTranslation()
   const rows = datasetToRows(dataset)
   const xKey = spec.x_key ?? null
   const valueKeys = spec.y_keys
@@ -37,9 +132,11 @@ export function LineChartVisualization({ spec, dataset }: Props) {
     !xKey ||
     !fieldExists(rows, xKey) ||
     valueKeys.length === 0 ||
-    !valueKeys.every((key) => numericFieldExists(rows, key))
+    !valueKeys.every((key) =>
+      numericFieldExists(rows, key),
+    )
   ) {
-    return <Fallback />
+    return <Fallback text={t.vizNoChartData} />
   }
 
   const seriesKey = spec.series_key ?? null
@@ -48,52 +145,107 @@ export function LineChartVisualization({ spec, dataset }: Props) {
     fieldExists(rows, seriesKey) &&
     rows.some((row) => {
       const value = resolveField(row, seriesKey)
-      return value !== undefined && value !== null && String(value) !== ''
+
+      return (
+        value !== undefined &&
+        value !== null &&
+        String(value) !== ''
+      )
     })
 
   if (hasSeries && valueKeys.length === 1) {
     const metricKey = valueKeys[0]
     const flat = rows.map((row) => ({
       [xKey]: resolveField(row, xKey),
-      __series: resolveField(row, seriesKey!),
+      __series: visualizationValueLabel(
+        language,
+        resolveField(row, seriesKey!),
+      ),
       __value: resolveField(row, metricKey),
     }))
 
-    const { wideData, seriesValues } = longToWide(
-      flat,
-      xKey,
-      '__series',
-      '__value',
-    )
+    const { wideData, seriesValues } =
+      longToWide(
+        flat,
+        xKey,
+        '__series',
+        '__value',
+      )
 
     return (
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer
+        width="100%"
+        height={280}
+      >
         <LineChart
           data={wideData}
-          margin={{ top: 8, right: 16, bottom: 8, left: 8 }}
+          margin={{
+            top: 8,
+            right: 16,
+            bottom: 8,
+            left: 8,
+          }}
         >
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(148,163,184,0.15)"
+            stroke="var(--viz-grid)"
           />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
+
+          <XAxis
+            dataKey={xKey}
+            tick={axisTick}
+            axisLine={axisLine}
+            tickLine={axisLine}
+          />
+
           <YAxis
-            tickFormatter={formatShortNumber}
-            tick={{ fontSize: 11 }}
+            tickFormatter={(value) =>
+              formatAxisTick(metricKey, value, language)
+            }
+            tick={axisTick}
+            axisLine={axisLine}
+            tickLine={axisLine}
           />
+
           <Tooltip
             formatter={(value, name) => [
-              formatMetricValue(metricKey, value),
+              formatMetricValue(
+                metricKey,
+                value,
+              ),
               String(name),
             ]}
+            contentStyle={{
+              background:
+                'var(--viz-tooltip-bg)',
+              border:
+                '1px solid var(--viz-tooltip-border)',
+              borderRadius: '8px',
+              boxShadow:
+                'var(--viz-tooltip-shadow)',
+              color: 'var(--text-h)',
+            }}
+            labelStyle={{
+              color: 'var(--text-h)',
+              fontWeight: 600,
+            }}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+
+          <Legend
+            wrapperStyle={{
+              fontSize: 11,
+              color: 'var(--text)',
+            }}
+          />
+
           {seriesValues.map((series, i) => (
             <Line
               key={series}
               type="monotone"
               dataKey={series}
-              stroke={COLORS[i % COLORS.length]}
+              stroke={
+                COLORS[i % COLORS.length]
+              }
               dot={false}
               strokeWidth={2}
             />
@@ -107,56 +259,186 @@ export function LineChartVisualization({ spec, dataset }: Props) {
     const item: Record<string, unknown> = {
       [xKey]: resolveField(row, xKey),
     }
+
     for (const key of valueKeys) {
       item[key] = resolveField(row, key)
     }
+
     return item
   })
 
+  const requestedSecondaryKeys = new Set(
+    spec.secondary_y_keys ?? [],
+  )
+  const secondaryKeys = valueKeys.filter(
+    (key) => requestedSecondaryKeys.has(key),
+  )
+  const primaryKeys = valueKeys.filter(
+    (key) => !requestedSecondaryKeys.has(key),
+  )
+
+  const isDualAxis =
+    primaryKeys.length > 0 &&
+    secondaryKeys.length > 0
+  const primaryMetricKey =
+    primaryKeys[0] ?? valueKeys[0]
+  const secondaryMetricKey =
+    secondaryKeys[0] ?? null
+
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer
+      width="100%"
+      height={300}
+    >
       <LineChart
         data={data}
-        margin={{ top: 8, right: 16, bottom: 8, left: 8 }}
+        margin={{
+          top: 8,
+          right: isDualAxis ? 28 : 16,
+          bottom: 8,
+          left: isDualAxis ? 20 : 8,
+        }}
       >
         <CartesianGrid
           strokeDasharray="3 3"
-          stroke="rgba(148,163,184,0.15)"
+          stroke="var(--viz-grid)"
         />
-        <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
+
+        <XAxis
+          dataKey={xKey}
+          tick={axisTick}
+          axisLine={axisLine}
+          tickLine={axisLine}
+        />
+
         <YAxis
-          tickFormatter={formatShortNumber}
-          tick={{ fontSize: 11 }}
+          yAxisId={PRIMARY_AXIS_ID}
+          orientation="left"
+          tickFormatter={(value) =>
+            formatAxisTick(
+              primaryMetricKey,
+              value,
+              language,
+            )
+          }
+          tick={axisTick}
+          axisLine={axisLine}
+          tickLine={axisLine}
+          width={isDualAxis ? 58 : 44}
+          label={
+            isDualAxis
+              ? {
+                  value:
+                    axisLabel(primaryKeys, language),
+                  angle: -90,
+                  position: 'insideLeft',
+                  style: {
+                    fontSize: 11,
+                    fill: 'var(--viz-axis)',
+                  },
+                }
+              : undefined
+          }
         />
+
+        {isDualAxis &&
+          secondaryMetricKey && (
+            <YAxis
+              yAxisId={SECONDARY_AXIS_ID}
+              orientation="right"
+              tickFormatter={(value) =>
+                formatAxisTick(
+                  secondaryMetricKey,
+                  value,
+                  language,
+                )
+              }
+              tick={axisTick}
+              axisLine={axisLine}
+              tickLine={axisLine}
+              width={68}
+              label={{
+                value:
+                  axisLabel(secondaryKeys, language),
+                angle: 90,
+                position: 'insideRight',
+                style: {
+                  fontSize: 11,
+                  fill: 'var(--viz-axis)',
+                },
+              }}
+            />
+          )}
+
         <Tooltip
           formatter={(value, name) => [
-            formatMetricValue(String(name), value),
-            humanizeKey(String(name)),
+            formatMetricValue(
+              String(name),
+              value,
+            ),
+            visualizationFieldLabel(language, String(name)),
           ]}
+          contentStyle={{
+            background:
+              'var(--viz-tooltip-bg)',
+            border:
+              '1px solid var(--viz-tooltip-border)',
+            borderRadius: '8px',
+            boxShadow:
+              'var(--viz-tooltip-shadow)',
+            color: 'var(--text-h)',
+          }}
+          labelStyle={{
+            color: 'var(--text-h)',
+            fontWeight: 600,
+          }}
         />
+
         {valueKeys.length > 1 && (
-          <Legend wrapperStyle={{ fontSize: 11 }} />
-        )}
-        {valueKeys.map((key, i) => (
-          <Line
-            key={key}
-            type="monotone"
-            dataKey={key}
-            name={key}
-            stroke={COLORS[i % COLORS.length]}
-            dot={false}
-            strokeWidth={2}
+          <Legend
+            formatter={(value) =>
+              visualizationFieldLabel(language, String(value))
+            }
+            wrapperStyle={{
+              fontSize: 11,
+              color: 'var(--text)',
+            }}
           />
-        ))}
+        )}
+
+        {valueKeys.map((key, i) => {
+          const useSecondaryAxis =
+            isDualAxis &&
+            requestedSecondaryKeys.has(key)
+
+          return (
+            <Line
+              key={key}
+              type="monotone"
+              dataKey={key}
+              name={key}
+              yAxisId={
+                useSecondaryAxis
+                  ? SECONDARY_AXIS_ID
+                  : PRIMARY_AXIS_ID
+              }
+              stroke={
+                COLORS[i % COLORS.length]
+              }
+              dot={false}
+              strokeWidth={2}
+            />
+          )
+        })}
       </LineChart>
     </ResponsiveContainer>
   )
 }
 
-function Fallback() {
+function Fallback({ text }: { text: string }) {
   return (
-    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-      No valid data to chart.
+    <div className="visualization-fallback">
+      {text}
     </div>
   )
 }

@@ -8,7 +8,10 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import type { VisualizationDataset, VisualizationSpec } from '../../types/agent'
+import type {
+  VisualizationDataset,
+  VisualizationSpec,
+} from '../../types/agent'
 import {
   datasetToRows,
   fieldExists,
@@ -19,14 +22,23 @@ import {
   COLORS,
   formatShortNumber,
 } from '../../features/dashboard/components/visualizationUtils'
-import { formatMetricValue, humanizeKey } from '../../lib/format'
+import { formatMetricValue } from '../../lib/format'
+import { useTranslation } from '../../i18n/LanguageContext'
+import {
+  visualizationFieldLabel,
+  visualizationValueLabel,
+} from '../../i18n/translations'
 
 interface Props {
   spec: VisualizationSpec
   dataset: VisualizationDataset
 }
 
-export function BarChartVisualization({ spec, dataset }: Props) {
+export function BarChartVisualization({
+  spec,
+  dataset,
+}: Props) {
+  const { language, t } = useTranslation()
   const rows = datasetToRows(dataset)
   const xKey = spec.x_key ?? null
   const valueKeys = spec.y_keys
@@ -36,30 +48,43 @@ export function BarChartVisualization({ spec, dataset }: Props) {
     !xKey ||
     !fieldExists(rows, xKey) ||
     valueKeys.length === 0 ||
-    !valueKeys.every((key) => numericFieldExists(rows, key))
+    !valueKeys.every((key) =>
+      numericFieldExists(rows, key),
+    )
   ) {
-    return <Fallback />
+    return <Fallback text={t.vizNoChartData} />
   }
 
   const data = rows.map((row) => {
     const item: Record<string, unknown> = {
-      [xKey]: resolveField(row, xKey),
+      [xKey]: visualizationValueLabel(
+        language,
+        resolveField(row, xKey),
+      ),
     }
+
     for (const key of valueKeys) {
       item[key] = resolveField(row, key)
     }
+
     return item
   })
 
   const longestLabel = Math.max(
-    ...data.map((item) => String(item[xKey] ?? '').length),
+    ...data.map((item) =>
+      String(item[xKey] ?? '').length,
+    ),
   )
-  const horizontal = data.length > 6 || longestLabel > 16
+  const horizontal =
+    data.length > 6 || longestLabel > 16
 
   return (
     <ResponsiveContainer
       width="100%"
-      height={Math.max(240, horizontal ? data.length * 34 : 260)}
+      height={Math.max(
+        240,
+        horizontal ? data.length * 34 : 260,
+      )}
     >
       <BarChart
         data={data}
@@ -73,7 +98,7 @@ export function BarChartVisualization({ spec, dataset }: Props) {
       >
         <CartesianGrid
           strokeDasharray="3 3"
-          stroke="rgba(148,163,184,0.15)"
+          stroke="var(--viz-grid)"
         />
 
         {horizontal ? (
@@ -81,13 +106,31 @@ export function BarChartVisualization({ spec, dataset }: Props) {
             <XAxis
               type="number"
               tickFormatter={formatShortNumber}
-              tick={{ fontSize: 11 }}
+              tick={{
+                fontSize: 11,
+                fill: 'var(--viz-axis)',
+              }}
+              axisLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
+              tickLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
             />
             <YAxis
               type="category"
               dataKey={xKey}
               width={160}
-              tick={{ fontSize: 11 }}
+              tick={{
+                fontSize: 11,
+                fill: 'var(--viz-axis)',
+              }}
+              axisLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
+              tickLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
               interval={0}
             />
           </>
@@ -95,7 +138,16 @@ export function BarChartVisualization({ spec, dataset }: Props) {
           <>
             <XAxis
               dataKey={xKey}
-              tick={{ fontSize: 11 }}
+              tick={{
+                fontSize: 11,
+                fill: 'var(--viz-axis)',
+              }}
+              axisLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
+              tickLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
               interval={0}
               angle={-15}
               textAnchor="end"
@@ -103,7 +155,16 @@ export function BarChartVisualization({ spec, dataset }: Props) {
             />
             <YAxis
               tickFormatter={formatShortNumber}
-              tick={{ fontSize: 11 }}
+              tick={{
+                fontSize: 11,
+                fill: 'var(--viz-axis)',
+              }}
+              axisLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
+              tickLine={{
+                stroke: 'var(--viz-axis-line)',
+              }}
             />
           </>
         )}
@@ -111,12 +172,32 @@ export function BarChartVisualization({ spec, dataset }: Props) {
         <Tooltip
           formatter={(value, name) => [
             formatMetricValue(String(name), value),
-            humanizeKey(String(name)),
+            visualizationFieldLabel(language, String(name)),
           ]}
+          contentStyle={{
+            background: 'var(--viz-tooltip-bg)',
+            border:
+              '1px solid var(--viz-tooltip-border)',
+            borderRadius: '8px',
+            boxShadow: 'var(--viz-tooltip-shadow)',
+            color: 'var(--text-h)',
+          }}
+          labelStyle={{
+            color: 'var(--text-h)',
+            fontWeight: 600,
+          }}
         />
 
         {valueKeys.length > 1 && (
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend
+            formatter={(value) =>
+              visualizationFieldLabel(language, String(value))
+            }
+            wrapperStyle={{
+              fontSize: 11,
+              color: 'var(--text)',
+            }}
+          />
         )}
 
         {valueKeys.map((key, i) => (
@@ -133,10 +214,10 @@ export function BarChartVisualization({ spec, dataset }: Props) {
   )
 }
 
-function Fallback() {
+function Fallback({ text }: { text: string }) {
   return (
-    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-      No valid data to chart.
+    <div className="visualization-fallback">
+      {text}
     </div>
   )
 }

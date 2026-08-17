@@ -205,6 +205,7 @@ class AgentService:
             StateKeys.ROLES: context.roles,
             StateKeys.CONVERSATION_ID: conversation_id,
             StateKeys.USER_MESSAGE: request.message,
+            StateKeys.UI_LANGUAGE: request.language,
             StateKeys.CURRENT_DATE: date.today().isoformat(),
             StateKeys.MCP_TOKEN: token,
             StateKeys.TOOL_CATALOG_JSON: json.dumps(catalog),

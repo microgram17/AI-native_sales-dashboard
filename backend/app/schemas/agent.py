@@ -8,6 +8,9 @@ from pydantic import BaseModel, Field
 from app.schemas.visualization import VisualizationDataset, VisualizationSpec
 
 
+UiLanguage = Literal["en", "sv"]
+
+
 RequestRoute = Literal[
     "new_data",
     "reuse_data",
@@ -33,6 +36,7 @@ class AgentQueryRequest(BaseModel):
 
     message: str
     conversation_id: str | None = None
+    language: UiLanguage = "sv"
 
 
 class PlannedToolCall(BaseModel):

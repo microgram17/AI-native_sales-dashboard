@@ -6,7 +6,7 @@ import { ChatMessage } from './ChatMessage'
 import { useTranslation } from '../../i18n/LanguageContext'
 
 export function ChatPanel() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -43,7 +43,11 @@ export function ChatPanel() {
       ...prev,
       { id: crypto.randomUUID(), role: 'user', content: text },
     ])
-    mutation.mutate({ message: text, conversation_id: conversationId })
+    mutation.mutate({
+      message: text,
+      conversation_id: conversationId,
+      language,
+    })
   }
 
   function handleNewConversation() {

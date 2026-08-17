@@ -1,10 +1,14 @@
 import { Component, type ReactNode } from 'react'
-import type { VisualizationDataset, VisualizationSpec } from '../../types/agent'
+import type {
+  VisualizationDataset,
+  VisualizationSpec,
+} from '../../types/agent'
 import { findDataset } from '../../lib/datasetResolver'
 import { MetricCardsVisualization } from './MetricCardsVisualization'
 import { BarChartVisualization } from './BarChartVisualization'
 import { LineChartVisualization } from './LineChartVisualization'
 import { TableVisualization } from './TableVisualization'
+import { useTranslation } from '../../i18n/LanguageContext'
 
 interface RendererProps {
   visualizations: VisualizationSpec[]
@@ -18,14 +22,7 @@ export function VisualizationRenderer({
   if (!visualizations || visualizations.length === 0) return null
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        marginTop: '0.6rem',
-      }}
-    >
+    <div className="visualization-list">
       {visualizations.map((spec, i) => (
         <VisualizationCard
           key={`${spec.dataset}-${i}`}
@@ -45,30 +42,22 @@ function VisualizationCard({
   datasets: VisualizationDataset[]
 }) {
   const dataset = findDataset(datasets, spec.dataset)
+  const { t } = useTranslation()
 
   return (
-    <div
-      style={{
-        border: '1px solid var(--border, #334155)',
-        borderRadius: '10px',
-        padding: '0.75rem',
-        background: 'rgba(30,41,59,0.4)',
-      }}
-    >
-      <div
-        style={{
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          marginBottom: '0.5rem',
-        }}
-      >
+    <div className="visualization-card">
+      <div className="visualization-title">
         {spec.title}
       </div>
-      <VizBoundary>
+
+      <VizBoundary fallbackText={t.vizRenderError}>
         {!dataset ? (
-          <FallbackNote text={`No visualization dataset "${spec.dataset}".`} />
+          <FallbackNote text={t.vizMissingDataset(spec.dataset)} />
         ) : (
-          <VisualizationBody spec={spec} dataset={dataset} />
+          <VisualizationBody
+            spec={spec}
+            dataset={dataset}
+          />
         )}
       </VizBoundary>
     </div>
@@ -84,24 +73,55 @@ function VisualizationBody({
 }) {
   switch (spec.type) {
     case 'metric_cards':
-      return <MetricCardsVisualization spec={spec} dataset={dataset} />
+      return (
+        <MetricCardsVisualization
+          spec={spec}
+          dataset={dataset}
+        />
+      )
     case 'bar_chart':
-      return <BarChartVisualization spec={spec} dataset={dataset} />
+      return (
+        <BarChartVisualization
+          spec={spec}
+          dataset={dataset}
+        />
+      )
     case 'line_chart':
-      return <LineChartVisualization spec={spec} dataset={dataset} />
+      return (
+        <LineChartVisualization
+          spec={spec}
+          dataset={dataset}
+        />
+      )
     case 'table':
-      return <TableVisualization spec={spec} dataset={dataset} />
+      return (
+        <TableVisualization
+          spec={spec}
+          dataset={dataset}
+        />
+      )
     default:
-      return <FallbackNote text="Unsupported visualization type." />
+      return (
+        <LocalizedUnsupportedFallback />
+      )
   }
 }
 
+function LocalizedUnsupportedFallback() {
+  const { t } = useTranslation()
+  return <FallbackNote text={t.vizUnsupported} />
+}
+
 function FallbackNote({ text }: { text: string }) {
-  return <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>{text}</div>
+  return (
+    <div className="visualization-fallback">
+      {text}
+    </div>
+  )
 }
 
 class VizBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; fallbackText: string },
   { failed: boolean }
 > {
   state = { failed: false }
@@ -112,8 +132,11 @@ class VizBoundary extends Component<
 
   render() {
     if (this.state.failed) {
-      return <FallbackNote text="This visualization could not be rendered." />
+      return (
+        <FallbackNote text={this.props.fallbackText} />
+      )
     }
+
     return this.props.children
   }
 }

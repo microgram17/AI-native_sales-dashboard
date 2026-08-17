@@ -7,6 +7,8 @@ const SEK = new Intl.NumberFormat('sv-SE', {
 const INT = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 })
 const DEC = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 2 })
 
+export type MetricFamily = 'currency' | 'rate' | 'count' | 'number'
+
 function isMonetaryKey(key: string): boolean {
   return /(sales|revenue|discount|price|sek|cost)/.test(key) && !/rate/.test(key)
 }
@@ -19,17 +21,25 @@ function isCountKey(key: string): boolean {
   return /(units|orders|count|rank|quantity)/.test(key)
 }
 
+export function metricFamily(key: string): MetricFamily {
+  const k = key.toLowerCase()
+  if (isRateKey(k)) return 'rate'
+  if (isMonetaryKey(k)) return 'currency'
+  if (isCountKey(k)) return 'count'
+  return 'number'
+}
+
 export function formatMetricValue(key: string, value: unknown): string {
   if (value == null || value === '') return '—'
   if (typeof value !== 'number' || Number.isNaN(value)) return String(value)
 
-  const k = key.toLowerCase()
-  if (isRateKey(k)) {
+  const family = metricFamily(key)
+  if (family === 'rate') {
     const pct = Math.abs(value) <= 1 ? value * 100 : value
     return `${DEC.format(pct)}%`
   }
-  if (isMonetaryKey(k)) return SEK.format(value)
-  if (isCountKey(k)) return INT.format(value)
+  if (family === 'currency') return SEK.format(value)
+  if (family === 'count') return INT.format(value)
   return DEC.format(value)
 }
 
