@@ -5,6 +5,18 @@ export interface Translations {
   dashboardTitle: string
   dateFrom: string
   dateTo: string
+  logout: string
+  // Authentication
+  loginTitle: string
+  loginSubtitle: string
+  loginEmail: string
+  loginPassword: string
+  loginButton: string
+  loginSigningIn: string
+  loginCheckingSession: string
+  loginInvalidCredentials: string
+  loginError: string
+  loginAdminNotAvailable: string
   // KPI cards
   netSales: string
   grossSales: string
@@ -50,6 +62,18 @@ export const translations: Record<Language, Translations> = {
     dashboardTitle: 'Supplier Dashboard',
     dateFrom: 'From',
     dateTo: 'To',
+    logout: 'Log out',
+    loginTitle: 'Sign in',
+    loginSubtitle: 'Use your supplier account to access the dashboard.',
+    loginEmail: 'Email',
+    loginPassword: 'Password',
+    loginButton: 'Sign in',
+    loginSigningIn: 'Signing in…',
+    loginCheckingSession: 'Checking session…',
+    loginInvalidCredentials: 'Incorrect email or password.',
+    loginError: 'Could not sign in. Please try again.',
+    loginAdminNotAvailable:
+      'Retailer admin supplier selection is not available in the current MVP UI.',
     netSales: 'Net Sales',
     grossSales: 'Gross Sales',
     unitsSold: 'Units Sold',
@@ -85,6 +109,18 @@ export const translations: Record<Language, Translations> = {
     dashboardTitle: 'Leverantörspanel',
     dateFrom: 'Från',
     dateTo: 'Till',
+    logout: 'Logga ut',
+    loginTitle: 'Logga in',
+    loginSubtitle: 'Använd ditt leverantörskonto för att öppna panelen.',
+    loginEmail: 'E-post',
+    loginPassword: 'Lösenord',
+    loginButton: 'Logga in',
+    loginSigningIn: 'Loggar in…',
+    loginCheckingSession: 'Kontrollerar session…',
+    loginInvalidCredentials: 'Fel e-postadress eller lösenord.',
+    loginError: 'Det gick inte att logga in. Försök igen.',
+    loginAdminNotAvailable:
+      'Val av leverantör för återförsäljaradmin finns inte i MVP-gränssnittet ännu.',
     netSales: 'Nettoomsättning',
     grossSales: 'Bruttoomsättning',
     unitsSold: 'Sålda enheter',

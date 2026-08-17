@@ -9,6 +9,7 @@ import { StoreBreakdownChart } from './components/StoreBreakdownChart'
 import { ChatPanel } from '../../components/chat/ChatPanel'
 import { useTranslation } from '../../i18n/LanguageContext'
 import { useTheme } from '../../i18n/ThemeContext'
+import { useAuth } from '../auth/AuthContext'
 
 function formatCardValue(value: number, unit: string | null): string {
   if (unit === 'SEK') {
@@ -24,6 +25,7 @@ function formatCardValue(value: number, unit: string | null): string {
 export function DashboardPage() {
   const { language, setLanguage, t } = useTranslation()
   const { theme, toggleTheme } = useTheme()
+  const { user, logout } = useAuth()
 
   // Shared date range
   const [dateFrom, setDateFrom] = useState('2025-07-01')
@@ -95,8 +97,17 @@ export function DashboardPage() {
         <div className="dashboard-title">
           <h1>{t.dashboardTitle}</h1>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '3px', alignItems: 'center', marginLeft: '0.5rem' }}>
+        <div className="dashboard-actions">
+          <div className="dashboard-account">
+            <span className="dashboard-account-name">
+              {user?.display_name ?? user?.email ?? user?.user_id}
+            </span>
+            <button className="logout-button" onClick={logout}>
+              {t.logout}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}

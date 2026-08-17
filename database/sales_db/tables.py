@@ -129,9 +129,15 @@ app_users = Table(
     metadata,
     Column("user_id", Text, primary_key=True),
     Column("auth_subject", Text, nullable=False, unique=True),
-    Column("email", Text, nullable=False),
+    Column("email", Text, nullable=False, unique=True),
     Column("display_name", Text),
+    Column("password_hash", Text),
+    Column("account_type", Text, nullable=False, server_default="supplier"),
     Column("active", Boolean, nullable=False, server_default="true"),
+    CheckConstraint(
+        "account_type IN ('supplier', 'retailer_admin')",
+        name="app_user_account_type_valid",
+    ),
     Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")),
     Column("updated_at", TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")),
 )
@@ -154,7 +160,7 @@ supplier_memberships = Table(
     Column("role", Text, nullable=False),
     Column("active", Boolean, nullable=False, server_default="true"),
     Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")),
-    CheckConstraint("role IN ('admin', 'analyst', 'viewer')", name="role_valid"),
+    CheckConstraint("role IN ('analyst', 'viewer')", name="role_valid"),
 )
 
 Index("idx_orders_order_date", orders.c.order_date)

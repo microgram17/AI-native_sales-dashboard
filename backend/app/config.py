@@ -14,12 +14,15 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5433/retail_bi"
+    database_url: str = (
+        "postgresql+psycopg://postgres:postgres@localhost:5433/retail_bi"
+    )
 
     jwt_secret: str = "dev-insecure-change-me"
     jwt_algorithm: str = "HS256"
     jwt_issuer: str | None = None
     jwt_audience: str | None = None
+    jwt_ttl_seconds: int = 3600
 
     # Streamable-HTTP URL of the MCP analytics server. A trailing slash is
     # stripped by the client to avoid a 307 redirect on POST.

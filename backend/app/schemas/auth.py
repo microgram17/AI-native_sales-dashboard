@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+AccountType = Literal["supplier", "retailer_admin"]
 
 
 class VerifiedIdentity(BaseModel):
@@ -17,6 +22,8 @@ class AppUser(BaseModel):
     auth_subject: str
     email: str
     display_name: str | None = None
+    password_hash: str | None = None
+    account_type: AccountType = "supplier"
     active: bool
 
 
@@ -29,9 +36,24 @@ class SupplierMembership(BaseModel):
     active: bool
 
 
+class AuthLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=512)
+
+
+class AuthLoginResponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int
+    account_type: AccountType
+
+
 class AuthMeResponse(BaseModel):
     """Response body for GET /auth/me."""
 
     user_id: str
+    email: str | None = None
+    display_name: str | None = None
+    account_type: AccountType
     supplier_id: str
     roles: list[str]

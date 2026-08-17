@@ -11,7 +11,9 @@ from sqlalchemy.engine import Connection
 
 from app.config import Settings, get_settings
 from app.db.engine import get_connection
+from app.integrations.auth.jwt_issuer import JwtIssuer
 from app.integrations.auth.jwt_verifier import JwtVerifier
+from app.integrations.auth.password_hasher import PasswordHasher
 from app.repositories.auth_repository import AuthRepository
 from app.repositories.dashboard_repository import DashboardRepository
 from app.schemas.request_context import RequestContext
@@ -68,14 +70,47 @@ def get_auth_repository(connection: ConnectionDep) -> AuthRepository:
 AuthRepositoryDep = Annotated[AuthRepository, Depends(get_auth_repository)]
 
 
+def get_jwt_issuer(settings: SettingsDep) -> JwtIssuer:
+    return JwtIssuer(
+        secret=settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+        ttl_seconds=settings.jwt_ttl_seconds,
+    )
+
+
+JwtIssuerDep = Annotated[JwtIssuer, Depends(get_jwt_issuer)]
+
+
+@lru_cache
+def get_password_hasher() -> PasswordHasher:
+    return PasswordHasher()
+
+
+PasswordHasherDep = Annotated[
+    PasswordHasher,
+    Depends(get_password_hasher),
+]
+
+
 def get_authentication_service(
-    verifier: JwtVerifierDep, repository: AuthRepositoryDep
+    verifier: JwtVerifierDep,
+    repository: AuthRepositoryDep,
+    issuer: JwtIssuerDep,
+    password_hasher: PasswordHasherDep,
 ) -> AuthenticationService:
-    return AuthenticationService(verifier, repository)
+    return AuthenticationService(
+        verifier,
+        repository,
+        issuer,
+        password_hasher,
+    )
 
 
 AuthenticationServiceDep = Annotated[
-    AuthenticationService, Depends(get_authentication_service)
+    AuthenticationService,
+    Depends(get_authentication_service),
 ]
 
 
