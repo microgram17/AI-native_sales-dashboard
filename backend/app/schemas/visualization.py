@@ -36,6 +36,13 @@ class VisualizationSpec(BaseModel):
             "Used only by line_chart visualizations."
         ),
     )
+    selectable_y_keys: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional metrics the frontend may switch between locally without "
+            "another agent/MCP request. Used for interactive line charts."
+        ),
+    )
     series_key: str | None = None
     columns: list[str] = Field(
         default_factory=list,
@@ -44,6 +51,6 @@ class VisualizationSpec(BaseModel):
 
 
 class VisualizationPlan(BaseModel):
-    """Structured visualization-agent output (ADK LlmAgent output_schema)."""
+    """Deterministic rendering plan over normalized visualization datasets."""
 
     visualizations: list[VisualizationSpec] = Field(default_factory=list)

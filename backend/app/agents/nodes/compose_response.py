@@ -1,9 +1,5 @@
-"""Deterministic response composer node (no LLM call).
 
-A validated visualization is allowed to be the complete assistant answer. When
-the response-policy gate intentionally skips analytics, message therefore stays
-empty instead of adding generic filler such as "see the visualization below".
-"""
+"""Deterministically assemble the stable frontend AgentQueryResponse contract."""
 
 from __future__ import annotations
 
@@ -25,23 +21,32 @@ from app.schemas.visualization import (
 )
 
 
-def _coerce_viz(value: Any) -> VisualizationPlan:
+def _coerce_viz(
+    value: Any,
+) -> VisualizationPlan:
     if isinstance(value, VisualizationPlan):
         return value
     if isinstance(value, dict):
-        return VisualizationPlan.model_validate(value)
+        try:
+            return VisualizationPlan.model_validate(
+                value
+            )
+        except Exception:
+            return VisualizationPlan()
     if isinstance(value, str) and value.strip():
-        return VisualizationPlan.model_validate_json(value)
+        try:
+            return VisualizationPlan.model_validate_json(
+                value
+            )
+        except Exception:
+            return VisualizationPlan()
     return VisualizationPlan()
 
 
 def _coerce_viz_datasets(
-    value: str | list[dict[str, Any]] | None,
+    value: Any,
 ) -> list[VisualizationDataset]:
-    if value is None:
-        return []
-
-    raw: Any = value
+    raw = value
     if isinstance(value, str):
         if not value.strip():
             return []
@@ -64,16 +69,21 @@ def build_compose_response_node() -> BaseNode:
         ctx: Context,
         tool_results: list[dict[str, Any]] | None = None,
         visualization_plan: Any = None,
-        visualization_datasets_json: str = "[]",
+        visualization_datasets_json: Any = "[]",
         analysis: str | None = None,
+        direct_message: str | None = None,
         conversation_id: str = "",
         ui_language: str = "en",
     ) -> None:
         results = [
-            ExecutedToolCall.model_validate(result)
+            ExecutedToolCall.model_validate(
+                result
+            )
             for result in (tool_results or [])
         ]
-        viz = _coerce_viz(visualization_plan)
+        viz = _coerce_viz(
+            visualization_plan
+        )
         viz_datasets = _coerce_viz_datasets(
             visualization_datasets_json
         )
@@ -88,13 +98,11 @@ def build_compose_response_node() -> BaseNode:
             if spec.dataset in valid_dataset_ids
         ]
 
-        # Empty prose is intentional when a visualization completely answers a
-        # straightforward request. ChatMessage already supports rendering a
-        # visualization without a text block.
-        message = (analysis or "").strip()
+        message = (
+            (direct_message or "").strip()
+            or (analysis or "").strip()
+        )
 
-        # Only fall back to text when neither prose nor a valid visualization
-        # exists. Never add generic filler above a visualization.
         if not message and not specs:
             message = (
                 "Inget svar kunde genereras."
@@ -120,7 +128,10 @@ def build_compose_response_node() -> BaseNode:
                 Dataset(
                     call_id=result.call_id,
                     tool_name=result.tool_name,
-                    status=result.status or "success",
+                    status=(
+                        result.status
+                        or "success"
+                    ),
                     result=result.result or {},
                 )
                 for result in results
@@ -129,7 +140,10 @@ def build_compose_response_node() -> BaseNode:
             visualization_datasets=viz_datasets,
             visualizations=specs,
         )
-        ctx.state[StateKeys.RESPONSE] = response.model_dump(
+
+        ctx.state[
+            StateKeys.RESPONSE
+        ] = response.model_dump(
             mode="json"
         )
 

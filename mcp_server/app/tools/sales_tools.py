@@ -74,9 +74,11 @@ def register_sales_tools(
         - product: canonical product ID, exact product name, or partial product
           name.
 
-        Resolution is deterministic: exact ID, then exact case-insensitive name,
-        then partial name. A multiple match returns status="ambiguous" with
-        candidates; no match returns status="not_found". It never guesses.
+        Resolution is deterministic: exact ID, then exact case-insensitive
+        name, then partial name, then a conservative supplier-scoped fuzzy
+        fallback for likely typos. Fuzzy matching only resolves when one
+        candidate is a strong, clearly separated match. Otherwise the tool
+        returns ambiguous/not_found rather than guessing.
 
         supplier_id is resolved from trusted MCP context and is never exposed as
         a model-visible argument.

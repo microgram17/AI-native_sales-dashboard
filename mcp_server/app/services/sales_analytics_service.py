@@ -8,6 +8,8 @@ never produces narrative prose.
 from __future__ import annotations
 
 from datetime import date, timedelta
+from difflib import SequenceMatcher
+import re
 from typing import Any
 
 from app.contracts.sales import (
@@ -71,6 +73,94 @@ def _period_label(grain: TrendGrain, start: date) -> str:
         return f"{start.year}-{start.month:02d}"
     quarter = (start.month - 1) // 3 + 1
     return f"{start.year}-Q{quarter}"
+
+
+def _normalize_product_text(value: str) -> str:
+    return " ".join(
+        re.sub(
+            r"[^\w\s-]",
+            " ",
+            value.casefold(),
+        ).split()
+    )
+
+
+def _product_similarity(
+    query: str,
+    name: str,
+) -> float:
+    """Conservative typo similarity over full names and individual tokens."""
+
+    q = _normalize_product_text(query)
+    n = _normalize_product_text(name)
+    if not q or not n:
+        return 0.0
+
+    full = SequenceMatcher(
+        None,
+        q,
+        n,
+    ).ratio()
+
+    q_tokens = q.replace("-", " ").split()
+    n_tokens = n.replace("-", " ").split()
+    if not q_tokens or not n_tokens:
+        return full
+
+    token_score = sum(
+        max(
+            SequenceMatcher(
+                None,
+                q_token,
+                n_token,
+            ).ratio()
+            for n_token in n_tokens
+        )
+        for q_token in q_tokens
+    ) / len(q_tokens)
+
+    return max(
+        full,
+        token_score,
+    )
+
+
+def _fuzzy_product_candidates(
+    query: str,
+    rows: list[dict[str, Any]],
+) -> list[
+    tuple[
+        float,
+        dict[str, Any],
+    ]
+]:
+    scored = [
+        (
+            _product_similarity(
+                query,
+                str(
+                    row.get(
+                        "product_name"
+                    )
+                    or ""
+                ),
+            ),
+            row,
+        )
+        for row in rows
+    ]
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            str(
+                item[1].get(
+                    "product_name"
+                )
+                or ""
+            ),
+        )
+    )
+    return scored
 
 
 class SalesAnalyticsService:
@@ -658,8 +748,11 @@ class SalesAnalyticsService:
         1. exact canonical ID (case-insensitive)
         2. exact product name (case-insensitive)
         3. partial product name
+        4. conservative supplier-scoped fuzzy fallback for likely typos
 
-        Ambiguous partial/exact-name matches are never guessed.
+        Ambiguous matches are never guessed. Fuzzy matching only resolves when
+        one candidate is both strong and clearly separated from the next best
+        candidate.
         """
 
         query = product.strip()
@@ -704,8 +797,6 @@ class SalesAnalyticsService:
             supplier_id=supplier_id,
             value=query,
         )
-        if not partial:
-            return ProductResolutionResult(status="not_found")
         if len(partial) == 1:
             row = partial[0]
             return ProductResolutionResult(
@@ -716,9 +807,66 @@ class SalesAnalyticsService:
                     name=row["product_name"],
                 ),
             )
+        if len(partial) > 1:
+            return ProductResolutionResult(
+                status="ambiguous",
+                candidates=self._candidates(partial),
+            )
+
+        # Conservative typo fallback. It only auto-resolves when one
+        # supplier-owned candidate is both strong and clearly separated from
+        # the second-best match.
+        catalogue = await self._repo.list_products_for_resolution(
+            supplier_id=supplier_id,
+        )
+        scored = _fuzzy_product_candidates(
+            query,
+            catalogue,
+        )
+        if not scored or scored[0][0] < 0.75:
+            return ProductResolutionResult(
+                status="not_found"
+            )
+
+        best_score, best_row = scored[0]
+        second_score = (
+            scored[1][0]
+            if len(scored) > 1
+            else 0.0
+        )
+
+        if (
+            best_score >= 0.86
+            and best_score - second_score >= 0.08
+        ):
+            return ProductResolutionResult(
+                status="success",
+                product=AnalyticsEntity(
+                    type="product",
+                    id=best_row["product_id"],
+                    name=best_row["product_name"],
+                ),
+            )
+
+        candidates = [
+            row
+            for score, row in scored[:5]
+            if score
+            >= max(
+                0.75,
+                best_score - 0.08,
+            )
+        ]
+        if candidates:
+            return ProductResolutionResult(
+                status="ambiguous",
+                candidates=self._candidates(
+                    candidates
+                ),
+            )
+
         return ProductResolutionResult(
-            status="ambiguous",
-            candidates=self._candidates(partial),
+            status="not_found"
         )
 
     @staticmethod

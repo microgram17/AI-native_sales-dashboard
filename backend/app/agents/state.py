@@ -1,4 +1,5 @@
-"""Typed helpers for the ADK workflow session state."""
+
+"""State contract for the simplified semantic agent workflow."""
 
 from __future__ import annotations
 
@@ -15,71 +16,48 @@ class StateKeys:
     UI_LANGUAGE = "ui_language"
     CURRENT_DATE = "current_date"
     CONVERSATION_ID = "conversation_id"
-
     MCP_TOKEN = "mcp_token"
 
-    ROUTE_DECISION = "route_decision"
-    EFFECTIVE_ROUTE = "effective_route"
-    HAS_PRIOR_RESULTS = "has_prior_results"
-    PRIOR_CONTEXT_SUMMARY = "prior_context_summary"
+    MCP_CAPABILITIES_JSON = "mcp_capabilities_json"
 
-    TOOL_CATALOG_JSON = "tool_catalog_json"
-    AVAILABLE_TOOL_NAMES = "available_tool_names"
-    VALIDATION_ERRORS_TEXT = "validation_errors_text"
-    RETRY_COUNT = "retry_count"
-    TOOL_PLAN = "tool_plan"
-    RESOLVED_PRODUCT_JSON = "resolved_product_json"
+    CANONICAL_REQUEST_JSON = "canonical_request_json"
+    LAST_HAS_RESULTS = "last_has_results"
+    LAST_TOOL_RESULTS = "last_tool_results"
+    LAST_BUSINESS_RESULTS_JSON = "last_business_results_json"
 
+    TURN_INTERPRETATION = "turn_interpretation"
+    EFFECTIVE_MODE = "effective_mode"
     TOOL_RESULTS = "tool_results"
-    SUCCESSFUL_RESULTS_JSON = "successful_results_json"
-    LAST_VALIDATION_FAILED = "last_validation_failed"
-
+    BUSINESS_RESULTS_JSON = "business_results_json"
     VISUALIZATION_DATASETS_JSON = "visualization_datasets_json"
     VISUALIZATION_PLAN = "visualization_plan"
     ANALYSIS = "analysis"
+    DIRECT_MESSAGE = "direct_message"
     RESPONSE = "response"
 
-    CTX_HAS_RESULTS = "ctx_has_results"
-    CTX_RESULTS_JSON = "ctx_results_json"
-    CTX_TOOL_CALLS_JSON = "ctx_tool_calls_json"
-    CTX_ENTITIES_JSON = "ctx_entities_json"
-    CTX_PERIOD_JSON = "ctx_period_json"
-    CTX_SCOPE_JSON = "ctx_scope_json"
-    CTX_LAST_REQUEST_JSON = "ctx_last_request_json"
 
-
-ROUTE_NEW_DATA = "new_data"
-ROUTE_REUSE_DATA = "reuse_data"
-ROUTE_VISUALIZATION_ONLY = "visualization_only"
-ROUTE_ANALYSIS_ONLY = "analysis_only"
+ROUTE_EXECUTE = "execute"
+ROUTE_REUSE = "reuse"
 ROUTE_CONVERSATION = "conversation"
+ROUTE_DIRECT = "direct"
 
-PRODUCT_RESOLVER_TOOL_NAME = "resolve_product"
-
-ROUTE_RETRY = "retry"
 ROUTE_RESOLUTION_PROCEED = "resolution_proceed"
 ROUTE_RESOLUTION_STOP = "resolution_stop"
-ROUTE_PROCEED = "proceed"
-ROUTE_DO_VIZ = "do_viz"
-ROUTE_SKIP_VIZ = "skip_viz"
+
 ROUTE_DO_ANALYTICS = "do_analytics"
 ROUTE_SKIP_ANALYTICS = "skip_analytics"
 
 
 TRANSIENT_STATE_RESET = {
-    StateKeys.TOOL_PLAN: None,
-    StateKeys.RESOLVED_PRODUCT_JSON: None,
+    StateKeys.TURN_INTERPRETATION: None,
+    StateKeys.EFFECTIVE_MODE: None,
     StateKeys.TOOL_RESULTS: [],
-    StateKeys.SUCCESSFUL_RESULTS_JSON: "[]",
-    StateKeys.VALIDATION_ERRORS_TEXT: "",
-    StateKeys.RETRY_COUNT: 0,
-    StateKeys.LAST_VALIDATION_FAILED: False,
+    StateKeys.BUSINESS_RESULTS_JSON: "[]",
     StateKeys.VISUALIZATION_DATASETS_JSON: "[]",
     StateKeys.VISUALIZATION_PLAN: None,
     StateKeys.ANALYSIS: None,
+    StateKeys.DIRECT_MESSAGE: None,
     StateKeys.RESPONSE: None,
-    StateKeys.ROUTE_DECISION: None,
-    StateKeys.EFFECTIVE_ROUTE: None,
 }
 
 
@@ -98,12 +76,21 @@ class ExecutedToolCall(BaseModel):
 
     @property
     def is_success(self) -> bool:
-        return self.error is None and self.status == "success" and self.result is not None
+        return (
+            self.error is None
+            and self.status == "success"
+            and self.result is not None
+        )
 
     @property
     def is_business_result(self) -> bool:
         return (
             self.error is None
-            and self.status in {"success", "no_data", "not_found", "ambiguous"}
+            and self.status in {
+                "success",
+                "no_data",
+                "not_found",
+                "ambiguous",
+            }
             and self.result is not None
         )

@@ -1,167 +1,92 @@
-"""Resolve named product references before analytical MCP execution.
-
-The planner supplies semantic product_query text. This node is responsible for
-turning that text into a supplier-scoped canonical product identity through the
-MCP resolve_product capability and injecting the canonical ID into the
-analytical plan.
-
-If resolution is ambiguous or fails to find a product, analytical execution is
-stopped. This intentionally prevents an unresolved named-product request from
-falling back to an unscoped supplier-wide query.
-"""
+"""Resolve a pending product query to canonical ID + name before analytics."""
 
 from __future__ import annotations
 
 import json
-from copy import deepcopy
 from typing import Any
 
 from google.adk.agents.context import Context
 from google.adk.workflow import BaseNode, node
 
+from app.agents.request_state import coerce_request, request_to_json
 from app.agents.state import (
-    PRODUCT_RESOLVER_TOOL_NAME,
     ROUTE_RESOLUTION_PROCEED,
     ROUTE_RESOLUTION_STOP,
     ExecutedToolCall,
     StateKeys,
 )
+from app.integrations.mcp.capabilities import CAP_PRODUCT_RESOLVER
 from app.integrations.mcp.client import McpClient, McpClientError
-from app.schemas.agent import PlannedToolCallDraft, ToolPlan
+from app.schemas.agent import CanonicalProduct
 
 
-_PRODUCT_SCOPED_TOOLS = {
-    "sales_summary",
-    "sales_rank",
-    "sales_trend",
-}
-
-
-def _empty_plan() -> ToolPlan:
-    return ToolPlan(
-        tool_calls=[],
-        product_query=None,
-        requested_grain=None,
-        inherit_period=False,
-        inherit_scope=False,
-        inherit_entity=False,
-        inherit_operation=False,
-    )
-
-
-def _coerce_plan(value: Any) -> ToolPlan:
-    if isinstance(value, ToolPlan):
-        return value
+def _capabilities(value: Any) -> dict[str, str]:
     if isinstance(value, dict):
-        return ToolPlan.model_validate(value)
+        return {str(k): str(v) for k, v in value.items()}
     if isinstance(value, str) and value.strip():
-        return ToolPlan.model_validate_json(value)
-    return _empty_plan()
+        try:
+            raw = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        if isinstance(raw, dict):
+            return {str(k): str(v) for k, v in raw.items()}
+    return {}
 
 
-def _product_query(plan: ToolPlan) -> str | None:
-    if isinstance(plan.product_query, str) and plan.product_query.strip():
-        return plan.product_query.strip()
+def _set_resolution_outcome(
+    ctx: Context,
+    call: ExecutedToolCall,
+) -> None:
+    serialized = call.model_dump(mode="json")
+    business = [
+        {
+            "call_id": call.call_id,
+            "tool_name": call.tool_name,
+            "result": call.result,
+        }
+    ]
 
-    # Safety for older/faulty planner output: product_overview's product
-    # argument is still an explicit single-product reference.
-    for draft in plan.tool_calls:
-        call = draft.to_call()
-        if call.tool_name != "product_overview":
-            continue
-        product = call.arguments.get("product")
-        if isinstance(product, str) and product.strip():
-            return product.strip()
-
-    return None
-
-
-def _inject_product(
-    plan: ToolPlan,
-    product_id: str,
-) -> ToolPlan:
-    resolved_calls: list[PlannedToolCallDraft] = []
-
-    for draft in plan.tool_calls:
-        call = draft.to_call()
-        arguments = deepcopy(call.arguments)
-
-        if call.tool_name == "product_overview":
-            arguments["product"] = product_id
-
-        elif call.tool_name in _PRODUCT_SCOPED_TOOLS:
-            scope = arguments.get("scope")
-            if not isinstance(scope, dict):
-                scope = {}
-            else:
-                scope = deepcopy(scope)
-
-            # An explicitly resolved current-turn product always wins over an
-            # empty, guessed, or stale draft product_ids value.
-            scope["product_ids"] = [product_id]
-            arguments["scope"] = scope
-
-        resolved_calls.append(
-            PlannedToolCallDraft(
-                call_id=call.call_id,
-                tool_name=call.tool_name,
-                arguments_json=json.dumps(
-                    arguments,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                ),
-                purpose=call.purpose,
-            )
-        )
-
-    return ToolPlan(
-        tool_calls=resolved_calls,
-        product_query=plan.product_query,
-        requested_grain=plan.requested_grain,
-        inherit_period=plan.inherit_period,
-        inherit_scope=plan.inherit_scope,
-        inherit_entity=plan.inherit_entity,
-        inherit_operation=plan.inherit_operation,
+    ctx.state[StateKeys.TOOL_RESULTS] = [serialized]
+    ctx.state[StateKeys.BUSINESS_RESULTS_JSON] = json.dumps(
+        business,
+        ensure_ascii=False,
     )
 
-
-def _resolution_payload(
-    query: str,
-    structured: dict[str, Any],
-) -> ExecutedToolCall:
-    return ExecutedToolCall(
-        call_id="__resolve_product__",
-        tool_name=PRODUCT_RESOLVER_TOOL_NAME,
-        arguments={"product": query},
-        purpose="Resolve the named product before analytics.",
-        status=structured.get("status"),
-        result=structured,
+    ctx.state[StateKeys.LAST_HAS_RESULTS] = False
+    ctx.state[StateKeys.LAST_TOOL_RESULTS] = [serialized]
+    ctx.state[StateKeys.LAST_BUSINESS_RESULTS_JSON] = json.dumps(
+        business,
+        ensure_ascii=False,
     )
 
 
 def build_resolve_entities_node(mcp: McpClient) -> BaseNode:
     async def resolve_entities(
         ctx: Context,
-        tool_plan: Any = None,
-        available_tool_names: list[str] | None = None,
+        canonical_request_json: Any = "null",
+        mcp_capabilities_json: Any = "{}",
         mcp_token: str | None = None,
     ) -> None:
-        plan = _coerce_plan(tool_plan)
-        query = _product_query(plan)
+        request = coerce_request(canonical_request_json)
+        if request is None:
+            raise RuntimeError("Canonical analytical request is missing.")
 
-        if query is None:
+        query = (request.pending_product_query or "").strip()
+        if not query:
             ctx.route = ROUTE_RESOLUTION_PROCEED
             return
 
-        if PRODUCT_RESOLVER_TOOL_NAME not in set(available_tool_names or []):
-            # Never proceed unscoped when a named product cannot be resolved.
+        tool_name = _capabilities(mcp_capabilities_json).get(
+            CAP_PRODUCT_RESOLVER
+        )
+        if not tool_name:
             raise RuntimeError(
-                "The MCP product resolver capability is unavailable."
+                "The MCP product-resolution capability is unavailable."
             )
 
         try:
             outcome = await mcp.call_tool(
-                PRODUCT_RESOLVER_TOOL_NAME,
+                tool_name,
                 {"product": query},
                 token=mcp_token,
             )
@@ -190,49 +115,29 @@ def build_resolve_entities_node(mcp: McpClient) -> BaseNode:
                     "Product resolver returned success without a canonical product."
                 )
 
-            canonical = {
-                "type": "product",
-                "id": str(product["id"]),
-                "name": str(product["name"]),
-            }
-            ctx.state[StateKeys.RESOLVED_PRODUCT_JSON] = json.dumps(
-                canonical,
-                ensure_ascii=False,
+            resolved = request.model_copy(
+                update={
+                    "entity": CanonicalProduct(
+                        id=str(product["id"]),
+                        name=str(product["name"]),
+                    ),
+                    "pending_product_query": None,
+                }
             )
-            resolved_plan = _inject_product(
-                plan,
-                canonical["id"],
-            )
-            ctx.state[StateKeys.TOOL_PLAN] = resolved_plan.model_dump(
-                mode="json"
-            )
+            ctx.state[StateKeys.CANONICAL_REQUEST_JSON] = request_to_json(resolved)
             ctx.route = ROUTE_RESOLUTION_PROCEED
             return
 
         if status in {"not_found", "ambiguous"}:
-            result = _resolution_payload(query, structured)
-            serialized_result = result.model_dump(mode="json")
-            ctx.state[StateKeys.TOOL_RESULTS] = [serialized_result]
-            ctx.state[StateKeys.SUCCESSFUL_RESULTS_JSON] = json.dumps(
-                [
-                    {
-                        "call_id": result.call_id,
-                        "tool_name": result.tool_name,
-                        "result": result.result,
-                    }
-                ],
-                ensure_ascii=False,
+            call = ExecutedToolCall(
+                call_id="__product_resolution__",
+                tool_name=tool_name,
+                arguments={"product": query},
+                purpose="Resolve the named product before analytics.",
+                status=status,
+                result=structured,
             )
-
-            # The current turn explicitly changed product identity but could not
-            # resolve it. Do not leave older product data/entity context marked
-            # as reusable, otherwise a later elliptical follow-up could
-            # accidentally operate on the previous product.
-            ctx.state[StateKeys.CTX_HAS_RESULTS] = False
-            ctx.state[StateKeys.CTX_RESULTS_JSON] = "[]"
-            ctx.state[StateKeys.CTX_TOOL_CALLS_JSON] = [serialized_result]
-            ctx.state[StateKeys.CTX_ENTITIES_JSON] = "[]"
-
+            _set_resolution_outcome(ctx, call)
             ctx.route = ROUTE_RESOLUTION_STOP
             return
 
@@ -240,7 +145,4 @@ def build_resolve_entities_node(mcp: McpClient) -> BaseNode:
             f"Product resolver returned unsupported status {status!r}."
         )
 
-    return node(
-        resolve_entities,
-        name="resolve_entities",
-    )
+    return node(resolve_entities, name="resolve_entities")

@@ -1,8 +1,8 @@
 """Mints the short-lived internal JWT the backend sends to the MCP server.
 
 This token carries the trusted supplier context server-to-server. It is
-infrastructure only: it never becomes an LLM prompt, an MCP tool argument, part
-of a ToolPlan, or a model-visible field.
+infrastructure only: it never becomes an LLM prompt, an MCP tool argument,
+canonical analytical state, or a model-visible field.
 """
 
 from __future__ import annotations

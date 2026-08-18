@@ -11,6 +11,11 @@ export interface VisualizationSpec {
    * Empty/undefined means a normal single-axis visualization.
    */
   secondary_y_keys?: string[]
+  /**
+   * Optional metrics that can be selected locally for this visualization.
+   * Switching these does not make another agent or backend request.
+   */
+  selectable_y_keys?: string[]
   series_key?: string | null
   columns: string[]
 }

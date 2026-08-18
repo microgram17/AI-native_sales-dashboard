@@ -363,6 +363,33 @@ class SalesAnalyticsRepository:
         )
         return await self._fetch_all(stmt)
 
+    async def list_products_for_resolution(
+        self,
+        *,
+        supplier_id: str,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        """Return supplier product identities for conservative typo fallback.
+
+        Exact and substring matching run first. The catalogue is only scanned
+        when those deterministic paths fail.
+        """
+        stmt = (
+            select(
+                products.c.product_id,
+                products.c.product_name,
+            )
+            .where(
+                products.c.supplier_id
+                == supplier_id
+            )
+            .order_by(
+                products.c.product_name.asc()
+            )
+            .limit(limit)
+        )
+        return await self._fetch_all(stmt)
+
     async def fetch_product_rank_context(
         self,
         *,

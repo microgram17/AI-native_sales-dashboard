@@ -1,213 +1,94 @@
 from __future__ import annotations
 
-import json
-
 from app.agents.state import StateKeys
 from tests.conftest import (
     FakeMcpClient,
-    make_planner_node,
-    make_router_node,
-    rank_result,
+    make_interpreter_node,
+    mcp_result,
+    product_overview_success,
+    resolver_success,
     run_workflow,
 )
 
 
-def resolved_product(
-    product_id: str = "NORD-SHT-025",
-    product_name: str = "Oxford Button-Down",
-) -> dict:
-    return {
-        "status": "success",
-        "product": {
-            "type": "product",
-            "id": product_id,
-            "name": product_name,
-        },
-        "candidates": [],
-    }
+async def test_named_product_is_resolved_and_canonical_id_is_injected():
+    """Broad named-product performance requests normalize to product_overview.
 
+    The interpreter fixture deliberately emits operation="summary" to verify
+    that the deterministic semantic layer still recognizes the actual user
+    wording ("Hur har det gått ... för ...") as a broad product-performance
+    request.
+    """
 
-def q1_product_summary(
-    *,
-    product_id: str = "NORD-SHT-025",
-    status: str = "success",
-) -> dict:
-    base = {
-        "status": status,
-        "effective_period": {
-            "start": "2026-01-01",
-            "end": "2026-03-31",
-        },
-        "effective_scope": {
-            "channels": [],
-            "cities": [],
-            "store_ids": [],
-            "categories": [],
-            "product_ids": [product_id],
-        },
-        "warnings": [],
-    }
-    if status == "success":
-        base["current"] = {
-            "units": 62,
-            "net_sales": 19322.44,
-            "gross_sales": 20324.20,
-            "discounts": 1001.76,
-            "orders": 56,
-            "average_selling_price": 311.65,
-            "discount_rate": 0.0493,
-        }
-    else:
-        base["current"] = None
-    return base
-
-
-async def test_named_product_is_resolved_before_summary_and_canonical_id_is_injected():
-    draft = {
-        "call_id": "c1",
-        "tool_name": "sales_summary",
-        "arguments_json": json.dumps({
-            "period_start": "2026-01-01",
-            "period_end": "2026-03-31",
-            "scope": {"product_ids": []},
-        }),
-        "purpose": "get Oxford Button-Down performance",
-    }
     mcp = FakeMcpClient(
         call_results={
-            "resolve_product": rank_result(structured=resolved_product()),
-            "sales_summary": rank_result(structured=q1_product_summary()),
+            "resolve_product": resolver_success(),
+            "product_overview": mcp_result(
+                product_overview_success()
+            ),
         }
     )
 
     state = await run_workflow(
         mcp=mcp,
-        router=make_router_node("new_data"),
-        planner=make_planner_node(
-            [draft],
-            product_query="Oxford Button-Down",
+        interpreter=make_interpreter_node(
+            {
+                "mode": "new_analysis",
+                "operation": "summary",
+                "metrics": ["units", "net_sales"],
+                "period_start": "2026-01-01",
+                "period_end": "2026-03-31",
+                "product_query": "windereaker",
+            }
         ),
-        user_message="Hur gick Oxford Button-Down under Q1 2026?",
+        user_message="Hur har det gått under q1 för våran windereaker?",
     )
 
-    assert [name for name, _ in mcp.calls] == [
+    assert mcp.calls[0] == (
         "resolve_product",
-        "sales_summary",
-    ]
-    assert mcp.calls[0][1] == {"product": "Oxford Button-Down"}
-    assert mcp.calls[1][1]["scope"]["product_ids"] == ["NORD-SHT-025"]
-    assert state["retry_count"] == 0
-    assert state["last_validation_failed"] is False
+        {"product": "windereaker"},
+    )
 
-    entities = json.loads(state[StateKeys.CTX_ENTITIES_JSON])
-    assert entities == [{
-        "type": "product",
-        "id": "NORD-SHT-025",
-        "name": "Oxford Button-Down",
-    }]
+    # The semantic layer intentionally upgrades this broad single-product
+    # performance question from the interpreter's summary guess to
+    # product_overview.
+    assert mcp.calls[1][0] == "product_overview"
+    assert mcp.calls[1][1]["product"] == "AURA-JKT-025"
+    assert mcp.calls[1][1]["period_start"] == "2026-01-01"
+    assert mcp.calls[1][1]["period_end"] == "2026-03-31"
+
+    request_json = state[StateKeys.CANONICAL_REQUEST_JSON]
+    assert '"operation":"product_overview"' in request_json
+    assert "AURA-JKT-025" in request_json
+    assert "Windbreaker Jacket" in request_json
 
 
-async def test_ambiguous_product_stops_before_analytical_query():
-    draft = {
-        "call_id": "c1",
-        "tool_name": "sales_summary",
-        "arguments_json": json.dumps({
-            "period_start": "2026-01-01",
-            "period_end": "2026-03-31",
-        }),
-        "purpose": "get product performance",
-    }
-    ambiguous = {
-        "status": "ambiguous",
-        "product": None,
-        "candidates": [
-            {
-                "type": "product",
-                "id": "P1",
-                "name": "Logo Hoodie",
-            },
-            {
-                "type": "product",
-                "id": "P2",
-                "name": "Zip Hoodie",
-            },
-        ],
-    }
+async def test_not_found_stops_before_analytics_query():
     mcp = FakeMcpClient(
         call_results={
-            "resolve_product": rank_result(structured=ambiguous),
-            "sales_summary": rank_result(structured=q1_product_summary()),
+            "resolve_product": mcp_result(
+                {
+                    "status": "not_found",
+                    "product": None,
+                    "candidates": [],
+                }
+            )
         }
     )
 
     state = await run_workflow(
         mcp=mcp,
-        router=make_router_node("new_data"),
-        planner=make_planner_node(
-            [draft],
-            product_query="Hoodie",
+        interpreter=make_interpreter_node(
+            {
+                "mode": "new_analysis",
+                "operation": "summary",
+                "product_query": "not a real product",
+                "period_start": "2026-01-01",
+                "period_end": "2026-03-31",
+            }
         ),
-        user_message="Hur går Hoodie?",
-        state_overrides={
-            StateKeys.CTX_HAS_RESULTS: True,
-            StateKeys.CTX_RESULTS_JSON: '[{"old":"data"}]',
-            StateKeys.CTX_ENTITIES_JSON: json.dumps([
-                {
-                    "type": "product",
-                    "id": "OLD-1",
-                    "name": "Previous Product",
-                }
-            ]),
-        },
+        user_message="How did not a real product do?",
     )
 
     assert [name for name, _ in mcp.calls] == ["resolve_product"]
-    business = json.loads(state[StateKeys.SUCCESSFUL_RESULTS_JSON])
-    assert business[0]["result"]["status"] == "ambiguous"
-    assert state["response"]["datasets"] == []
-    assert state[StateKeys.CTX_HAS_RESULTS] is False
-    assert state[StateKeys.CTX_RESULTS_JSON] == "[]"
-    assert json.loads(state[StateKeys.CTX_ENTITIES_JSON]) == []
-
-
-async def test_resolved_product_is_persisted_even_when_period_has_no_sales():
-    draft = {
-        "call_id": "c1",
-        "tool_name": "sales_summary",
-        "arguments_json": json.dumps({
-            "period_start": "2020-01-01",
-            "period_end": "2020-03-31",
-        }),
-        "purpose": "get product performance",
-    }
-    no_data = q1_product_summary(status="no_data")
-    no_data["effective_period"] = {
-        "start": "2020-01-01",
-        "end": "2020-03-31",
-    }
-
-    mcp = FakeMcpClient(
-        call_results={
-            "resolve_product": rank_result(structured=resolved_product()),
-            "sales_summary": rank_result(structured=no_data),
-        }
-    )
-
-    state = await run_workflow(
-        mcp=mcp,
-        router=make_router_node("new_data"),
-        planner=make_planner_node(
-            [draft],
-            product_query="Oxford Button-Down",
-        ),
-        user_message="Hur gick Oxford Button-Down under Q1 2020?",
-    )
-
-    business = json.loads(state[StateKeys.SUCCESSFUL_RESULTS_JSON])
-    assert business[0]["result"]["status"] == "no_data"
-
-    entities = json.loads(state[StateKeys.CTX_ENTITIES_JSON])
-    assert entities[0]["id"] == "NORD-SHT-025"
-    period = json.loads(state[StateKeys.CTX_PERIOD_JSON])
-    assert period["start"] == "2020-01-01"
-    assert period["end"] == "2020-03-31"
+    assert state[StateKeys.LAST_HAS_RESULTS] is False

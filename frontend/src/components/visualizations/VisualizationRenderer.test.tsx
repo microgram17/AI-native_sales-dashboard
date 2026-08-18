@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { VisualizationRenderer } from './VisualizationRenderer'
 import { LanguageProvider } from '../../i18n/LanguageContext'
 import type {
@@ -55,11 +55,15 @@ const trendDataset: VisualizationDataset = {
       period_label: '2026-01',
       units: 1114,
       net_sales: 577975.25,
+      gross_sales: 630535.60,
+      orders: 844,
     },
     {
       period_label: '2026-02',
       units: 923,
       net_sales: 534170.10,
+      gross_sales: 544169.03,
+      orders: 698,
     },
   ],
 }
@@ -210,4 +214,83 @@ describe('VisualizationRenderer', () => {
       screen.getByText(/No visualization dataset/),
     ).toBeInTheDocument()
   })
+
+  it('preserves an originally requested multi-metric chart as a selector option', () => {
+    renderVisualization(
+      [
+        spec({
+          type: 'line_chart',
+          title: 'Utveckling – 2026',
+          dataset: 'c2:trend',
+          x_key: 'period_label',
+          y_keys: ['units', 'net_sales'],
+          secondary_y_keys: ['net_sales'],
+          selectable_y_keys: [
+            'net_sales',
+            'units',
+          ],
+        }),
+      ],
+      [trendDataset],
+    )
+
+    const selector = screen.getByRole('combobox')
+
+    expect(selector).toHaveValue('__requested_metrics__')
+    expect(
+      screen.getByRole('option', {
+        name: 'Sålda enheter + Nettoomsättning',
+      }),
+    ).toBeInTheDocument()
+
+    fireEvent.change(selector, {
+      target: { value: 'units' },
+    })
+    expect(selector).toHaveValue('units')
+
+    fireEvent.change(selector, {
+      target: { value: '__requested_metrics__' },
+    })
+    expect(selector).toHaveValue('__requested_metrics__')
+  })
+
+  it('lets the user switch an interactive line-chart metric locally', () => {
+    renderVisualization(
+      [
+        spec({
+          type: 'line_chart',
+          title: 'Utveckling för Windbreaker Jacket – Q1 2026',
+          dataset: 'c2:trend',
+          x_key: 'period_label',
+          y_keys: ['net_sales'],
+          selectable_y_keys: [
+            'net_sales',
+            'gross_sales',
+            'units',
+            'orders',
+          ],
+        }),
+      ],
+      [trendDataset],
+    )
+
+    const selector = screen.getByRole('combobox')
+    expect(selector).toHaveValue('net_sales')
+    expect(
+      screen.getByRole('option', { name: 'Nettoomsättning' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: 'Sålda enheter' }),
+    ).toBeInTheDocument()
+
+    fireEvent.change(selector, {
+      target: { value: 'units' },
+    })
+
+    expect(selector).toHaveValue('units')
+    expect(
+      screen.getByText('Utveckling för Windbreaker Jacket – Q1 2026'),
+    ).toBeInTheDocument()
+  })
+
 })

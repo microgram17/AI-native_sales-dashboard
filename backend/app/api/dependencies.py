@@ -27,9 +27,7 @@ from app.services.dashboard_service import DashboardService
 
 from app.agents.agents.analytics import build_analytics_agent
 from app.agents.agents.conversation import build_conversation_agent
-from app.agents.agents.planner import build_planner_agent
-from app.agents.agents.router import build_router_agent
-from app.agents.agents.visualization import build_visualization_agent
+from app.agents.agents.interpreter import build_interpreter_agent
 from app.agents.graph import build_workflow
 from app.agents.models import build_model
 from app.integrations.mcp.client import McpClient
@@ -186,9 +184,7 @@ def _build_agent_service() -> AgentService:
     mcp = McpClient(settings.mcp_server_url)
     workflow = build_workflow(
         mcp=mcp,
-        router=build_router_agent(model),
-        planner=build_planner_agent(model),
-        visualization=build_visualization_agent(model),
+        interpreter=build_interpreter_agent(model),
         analytics=build_analytics_agent(model),
         conversation=build_conversation_agent(model),
     )

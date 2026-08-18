@@ -1,31 +1,54 @@
+
 from __future__ import annotations
 
-import json
+from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.visualization import VisualizationDataset, VisualizationSpec
 
 
 UiLanguage = Literal["en", "sv"]
-RequestedGrain = Literal["day", "week", "month", "quarter"]
 
-
-RequestRoute = Literal[
-    "new_data",
-    "reuse_data",
-    "visualization_only",
-    "analysis_only",
+TurnMode = Literal[
+    "new_analysis",
+    "modify_analysis",
+    "visualize_existing",
+    "analyze_existing",
     "conversation",
 ]
 
+AnalysisOperation = Literal[
+    "summary",
+    "ranking",
+    "trend",
+    "product_overview",
+]
 
-class RouteDecision(BaseModel):
-    """Structured router output (closed schema for OpenAI strict mode)."""
+Metric = Literal[
+    "units",
+    "net_sales",
+    "gross_sales",
+    "discounts",
+    "orders",
+    "average_selling_price",
+    "discount_rate",
+]
 
-    route: RequestRoute
-    reason: str
+RankMetric = Literal[
+    "units",
+    "net_sales",
+    "gross_sales",
+    "discounts",
+    "orders",
+]
+
+Grain = Literal["day", "week", "month", "quarter"]
+GroupBy = Literal["product", "category", "store", "city", "channel"]
+RankOrder = Literal["highest", "lowest"]
+Channel = Literal["online", "physical"]
+Presentation = Literal["auto", "chart", "cards", "table"]
 
 
 class AgentQueryRequest(BaseModel):
@@ -40,73 +63,107 @@ class AgentQueryRequest(BaseModel):
     language: UiLanguage = "sv"
 
 
-class PlannedToolCall(BaseModel):
-    """A resolved tool invocation (internal, dict arguments)."""
+class ScopePatch(BaseModel):
+    """A partial scope update produced by the turn interpreter.
 
-    call_id: str
-    tool_name: str
-    arguments: dict[str, Any] = Field(default_factory=dict)
-    purpose: str | None = None
-
-
-class PlannedToolCallDraft(BaseModel):
-    """Planner LLM output for one call.
-
-    arguments_json is used instead of an open-ended dict so the structured
-    output schema remains compatible with strict model output.
+    None means "leave this dimension unchanged". An empty list means
+    "explicitly clear this dimension / include all".
     """
 
-    call_id: str
-    tool_name: str
-    arguments_json: str = "{}"
-    purpose: str | None = None
+    model_config = ConfigDict(extra="forbid")
 
-    def to_call(self) -> PlannedToolCall:
-        try:
-            arguments = (
-                json.loads(self.arguments_json)
-                if self.arguments_json
-                else {}
-            )
-        except (json.JSONDecodeError, TypeError):
-            arguments = {}
-
-        if not isinstance(arguments, dict):
-            arguments = {}
-
-        return PlannedToolCall(
-            call_id=self.call_id,
-            tool_name=self.tool_name,
-            arguments=arguments,
-            purpose=self.purpose,
-        )
+    channels: list[Channel] | None = None
+    cities: list[str] | None = None
+    store_ids: list[str] | None = None
+    categories: list[str] | None = None
 
 
-class ToolPlan(BaseModel):
-    """Structured planner output.
+class TurnInterpretation(BaseModel):
+    """Semantic interpretation of one user turn.
 
-    product_query is semantic entity intent, not a database identifier. When it
-    is set, a deterministic workflow node resolves it to a canonical product ID
-    before any analytical tool is allowed to run.
-
-    requested_grain declares that the requested output is a time series at that
-    grain. A deterministic retrieval finalizer uses it (plus high-confidence
-    wording in the user message) to prevent summary tools from satisfying a
-    trend request.
-
-    The four inheritance flags express which prior-context dimensions the
-    planner believes should continue into the current turn.
+    This is intentionally not an MCP/tool plan. The LLM describes what changed
+    in the user's analytical request; deterministic application code merges the
+    patch with prior state, resolves identities and chooses the MCP capability.
     """
 
-    tool_calls: list[PlannedToolCallDraft] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    mode: TurnMode
+
+    operation: AnalysisOperation | None = None
+    metrics: list[Metric] | None = None
+    grain: Grain | None = None
+
+    group_by: GroupBy | None = None
+    rank_by: RankMetric | None = None
+    rank_order: RankOrder | None = None
+    limit: int | None = Field(default=None, ge=1, le=20)
+
+    split_by: GroupBy | None = None
+    series_limit: int | None = Field(default=None, ge=1, le=10)
+
+    period_start: date | None = None
+    period_end: date | None = None
+    clear_period: bool = False
 
     product_query: str | None = None
-    requested_grain: RequestedGrain | None = None
+    clear_product: bool = False
 
-    inherit_period: bool
-    inherit_scope: bool
-    inherit_entity: bool
-    inherit_operation: bool
+    scope: ScopePatch = Field(default_factory=ScopePatch)
+
+    presentation: Presentation | None = None
+    interpretation_requested: bool = False
+
+
+class AnalysisScope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channels: list[Channel] = Field(default_factory=list)
+    cities: list[str] = Field(default_factory=list)
+    store_ids: list[str] = Field(default_factory=list)
+    categories: list[str] = Field(default_factory=list)
+
+
+class CanonicalProduct(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["product"] = "product"
+    id: str
+    name: str
+
+
+class AnalysisRequestState(BaseModel):
+    """Canonical analytical state persisted across turns.
+
+    Follow-ups patch this object. Anything the user does not change remains
+    unchanged, which removes the need for separate inherit_* flags.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation: AnalysisOperation
+    metrics: list[Metric] = Field(default_factory=list)
+
+    grain: Grain | None = None
+
+    group_by: GroupBy | None = None
+    rank_by: RankMetric | None = None
+    rank_order: RankOrder = "highest"
+    limit: int = Field(default=10, ge=1, le=20)
+
+    split_by: GroupBy | None = None
+    series_limit: int = Field(default=5, ge=1, le=10)
+
+    period_start: date | None = None
+    period_end: date | None = None
+
+    scope: AnalysisScope = Field(default_factory=AnalysisScope)
+
+    entity: CanonicalProduct | None = None
+    pending_product_query: str | None = None
+
+    presentation: Presentation = "auto"
+    interpretation_requested: bool = False
 
 
 class ToolCallInfo(BaseModel):

@@ -1,4 +1,4 @@
-import { Component, useRef, type ReactNode } from 'react'
+import { Component, useRef, useState, type ReactNode } from 'react'
 import type {
   VisualizationDataset,
   VisualizationSpec,
@@ -16,6 +16,8 @@ import {
   visualizationFieldLabel,
   visualizationValueLabel,
 } from '../../i18n/translations'
+
+const REQUESTED_METRICS_OPTION = '__requested_metrics__'
 
 interface RendererProps {
   visualizations: VisualizationSpec[]
@@ -57,8 +59,61 @@ function VisualizationCard({
   const { language, t } = useTranslation()
   const targetRef = useRef<HTMLDivElement>(null)
 
+  const selectableMetrics = dataset
+    ? Array.from(new Set(spec.selectable_y_keys ?? [])).filter(
+        (key) => numericMetricExists(dataset, key),
+      )
+    : []
+
+  const requestedMetrics = dataset
+    ? spec.y_keys.filter((key) =>
+        numericMetricExists(dataset, key),
+      )
+    : []
+
+  const hasRequestedMetricCombination =
+    requestedMetrics.length > 1
+
+  const defaultSelection = hasRequestedMetricCombination
+    ? REQUESTED_METRICS_OPTION
+    : (
+        requestedMetrics[0] ??
+        selectableMetrics[0] ??
+        ''
+      )
+
+  const [selectedMetric, setSelectedMetric] =
+    useState(defaultSelection)
+
+  const effectiveSelection =
+    selectedMetric === REQUESTED_METRICS_OPTION &&
+    hasRequestedMetricCombination
+      ? REQUESTED_METRICS_OPTION
+      : selectableMetrics.includes(selectedMetric)
+        ? selectedMetric
+        : defaultSelection
+
+  const hasMetricSelector =
+    spec.type === 'line_chart' &&
+    selectableMetrics.length > 1 &&
+    !!effectiveSelection
+
+  const effectiveSpec: VisualizationSpec =
+    !hasMetricSelector ||
+    effectiveSelection === REQUESTED_METRICS_OPTION
+      ? spec
+      : {
+          ...spec,
+          y_keys: [effectiveSelection],
+          secondary_y_keys: [],
+        }
+
   const exportColumns = dataset
-    ? getVisualizationExportColumns(spec, dataset, language)
+    ? getVisualizationExportColumns(
+        effectiveSpec,
+        dataset,
+        language,
+      )
     : []
   const exportFilters = dataset
     ? getToolCallFilters(dataset, toolCalls, language)
@@ -85,17 +140,89 @@ function VisualizationCard({
         )}
       </div>
 
+      {hasMetricSelector && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '0.75rem',
+            fontSize: '0.8125rem',
+          }}
+        >
+          <span
+            style={{
+              color: 'var(--muted)',
+              fontWeight: 500,
+            }}
+          >
+            {t.metric}
+          </span>
+          <select
+            aria-label={t.metric}
+            value={effectiveSelection}
+            onChange={(event) =>
+              setSelectedMetric(event.target.value)
+            }
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.8125rem',
+              borderRadius: '4px',
+              border: '1px solid var(--border, #334155)',
+              background: 'var(--surface, #1e293b)',
+              color: 'inherit',
+              cursor: 'pointer',
+            }}
+          >
+            {hasRequestedMetricCombination && (
+              <option value={REQUESTED_METRICS_OPTION}>
+                {requestedMetrics
+                  .map((metric) =>
+                    visualizationFieldLabel(language, metric),
+                  )
+                  .join(' + ')}
+              </option>
+            )}
+
+            {selectableMetrics.map((metric) => (
+              <option key={metric} value={metric}>
+                {visualizationFieldLabel(language, metric)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <VizBoundary fallbackText={t.vizRenderError}>
         {!dataset ? (
           <FallbackNote text={t.vizMissingDataset(spec.dataset)} />
         ) : (
           <VisualizationBody
-            spec={spec}
+            spec={effectiveSpec}
             dataset={dataset}
           />
         )}
       </VizBoundary>
     </div>
+  )
+}
+
+
+function numericMetricExists(
+  dataset: VisualizationDataset,
+  key: string,
+): boolean {
+  const values = dataset.rows
+    .map((row) => row[key])
+    .filter((value) => value != null)
+
+  return (
+    values.length > 0 &&
+    values.every(
+      (value) =>
+        typeof value === 'number' &&
+        !Number.isNaN(value),
+    )
   )
 }
 
