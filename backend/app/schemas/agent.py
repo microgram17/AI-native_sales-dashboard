@@ -9,6 +9,7 @@ from app.schemas.visualization import VisualizationDataset, VisualizationSpec
 
 
 UiLanguage = Literal["en", "sv"]
+RequestedGrain = Literal["day", "week", "month", "quarter"]
 
 
 RequestRoute = Literal[
@@ -84,13 +85,23 @@ class PlannedToolCallDraft(BaseModel):
 class ToolPlan(BaseModel):
     """Structured planner output.
 
-    The four inheritance flags express the planner's semantic interpretation of
-    a follow-up. A deterministic node applies the selected context before MCP
-    execution, so inherited context is not dependent on the model remembering
-    to repeat every argument.
+    product_query is semantic entity intent, not a database identifier. When it
+    is set, a deterministic workflow node resolves it to a canonical product ID
+    before any analytical tool is allowed to run.
+
+    requested_grain declares that the requested output is a time series at that
+    grain. A deterministic retrieval finalizer uses it (plus high-confidence
+    wording in the user message) to prevent summary tools from satisfying a
+    trend request.
+
+    The four inheritance flags express which prior-context dimensions the
+    planner believes should continue into the current turn.
     """
 
     tool_calls: list[PlannedToolCallDraft] = Field(default_factory=list)
+
+    product_query: str | None = None
+    requested_grain: RequestedGrain | None = None
 
     inherit_period: bool
     inherit_scope: bool

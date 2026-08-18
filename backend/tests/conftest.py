@@ -23,7 +23,7 @@ from app.integrations.mcp.client import (
 )
 from app.services.agent_service import AgentService
 
-TOOL_NAMES = ["sales_summary", "sales_rank", "sales_trend", "product_overview"]
+TOOL_NAMES = ["resolve_product", "sales_summary", "sales_rank", "sales_trend", "product_overview"]
 APP_NAME = "test-agent"
 
 
@@ -120,6 +120,8 @@ def make_planner_node(
     *,
     vary: Callable[[int], list[dict]] | None = None,
     capture: dict | None = None,
+    product_query: str | None = None,
+    requested_grain: str | None = None,
     inherit_period: bool = False,
     inherit_scope: bool = False,
     inherit_entity: bool = False,
@@ -136,6 +138,8 @@ def make_planner_node(
             )
         ctx.state[StateKeys.TOOL_PLAN] = {
             "tool_calls": vary(calls) if vary else (tool_calls or []),
+            "product_query": product_query,
+            "requested_grain": requested_grain,
             "inherit_period": inherit_period,
             "inherit_scope": inherit_scope,
             "inherit_entity": inherit_entity,
@@ -175,6 +179,7 @@ def _seed_state(overrides: dict[str, Any] | None = None) -> dict[str, Any]:
         StateKeys.SUPPLIER_ID: "NORDVALE",
         StateKeys.ROLES: ["admin"],
         StateKeys.USER_MESSAGE: "What is our best-selling product this year?",
+        StateKeys.UI_LANGUAGE: "en",
         StateKeys.CURRENT_DATE: "2026-08-12",
         StateKeys.CONVERSATION_ID: "conv-1",
         StateKeys.MCP_TOKEN: None,

@@ -8,10 +8,10 @@ from app.context.supplier_context import SupplierContextError
 from app.contracts.sales import ProductOverviewScope
 from app.tools.sales_tools import _run
 
-EXPECTED_TOOLS = {"sales_summary", "sales_rank", "sales_trend", "product_overview"}
+EXPECTED_TOOLS = {"resolve_product", "sales_summary", "sales_rank", "sales_trend", "product_overview"}
 
 
-async def test_exactly_four_tools_registered(mcp_server):
+async def test_expected_tools_registered(mcp_server):
     tools = await mcp_server.list_tools()
     names = {tool.name for tool in tools}
     assert names == EXPECTED_TOOLS
@@ -207,3 +207,30 @@ async def test_rank_exposes_unambiguous_population_and_returned_totals(mcp_serve
     assert structured["total_population_rank_metric_value"] >= structured[
         "returned_rows_rank_metric_value"
     ]
+
+
+async def test_resolve_product_exact_name(mcp_server):
+    _content, structured = await mcp_server.call_tool(
+        "resolve_product",
+        {"product": "Minimal Logo Hoodie"},
+    )
+    assert structured["status"] == "success"
+    assert structured["product"]["id"] == "NORD-HOD-011"
+    assert structured["product"]["name"] == "Minimal Logo Hoodie"
+
+
+async def test_resolve_product_ambiguous(mcp_server):
+    _content, structured = await mcp_server.call_tool(
+        "resolve_product",
+        {"product": "Hoodie"},
+    )
+    assert structured["status"] == "ambiguous"
+    assert len(structured["candidates"]) > 1
+
+
+async def test_resolve_product_not_found(mcp_server):
+    _content, structured = await mcp_server.call_tool(
+        "resolve_product",
+        {"product": "does-not-exist-zzz"},
+    )
+    assert structured["status"] == "not_found"

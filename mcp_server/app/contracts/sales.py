@@ -1,7 +1,7 @@
 """Typed MCP contract models for the supplier sales analytics tools.
 
 These models define the model-visible input scope and the structured output
-returned by the four analytics tools. They contain no visualization hints,
+returned by the analytics tools. They contain no visualization hints,
 chart types or frontend component information — only semantic analytical data.
 """
 
@@ -29,6 +29,7 @@ RankBy = Literal[
 RankOrder = Literal["highest", "lowest"]
 TrendGrain = Literal["day", "week", "month", "quarter"]
 Status = Literal["success", "no_data", "not_found", "ambiguous"]
+ProductResolutionStatus = Literal["success", "not_found", "ambiguous"]
 
 
 # ── Model-visible scope ─────────────────────────────────────────────────────────
@@ -58,8 +59,8 @@ class SalesScope(BaseModel):
         default_factory=list,
         description=(
             "Restrict to canonical product IDs only, e.g. 'NORD-HOD-011'. "
-            "Do not pass product names here. For a named single-product question, "
-            "use product_overview, which resolves product names."
+            "Do not pass product names here. Named products must be resolved "
+            "to canonical IDs first (or handled by product_overview)."
         ),
     )
 
@@ -172,6 +173,14 @@ class BreakdownRow(BaseModel):
 
 
 # ── Tool result models ──────────────────────────────────────────────────────────
+
+
+class ProductResolutionResult(BaseModel):
+    """Canonical supplier-scoped product identity resolution."""
+
+    status: ProductResolutionStatus
+    product: AnalyticsEntity | None = None
+    candidates: list[AnalyticsEntity] = Field(default_factory=list)
 
 
 class SalesSummaryResult(BaseModel):

@@ -35,6 +35,8 @@ _PRODUCT_SCOPE_TOOLS = {
 def _empty_plan() -> ToolPlan:
     return ToolPlan(
         tool_calls=[],
+        product_query=None,
+        requested_grain=None,
         inherit_period=False,
         inherit_scope=False,
         inherit_entity=False,
@@ -71,15 +73,28 @@ def _known_product_ids(state: Any) -> set[str]:
         [],
     )
     if not isinstance(entities, list):
-        return set()
+        entities = []
 
-    return {
+    known = {
         str(entity.get("id")).strip().casefold()
         for entity in entities
         if isinstance(entity, dict)
         and entity.get("type") == "product"
         and entity.get("id")
     }
+
+    resolved = _load_json(
+        state.get(StateKeys.RESOLVED_PRODUCT_JSON),
+        {},
+    )
+    if (
+        isinstance(resolved, dict)
+        and resolved.get("type") == "product"
+        and resolved.get("id")
+    ):
+        known.add(str(resolved["id"]).strip().casefold())
+
+    return known
 
 
 def _user_explicitly_supplied_id(
@@ -166,9 +181,10 @@ def _validate_product_id_provenance(
             f"{call.tool_name}: scope.product_ids contains unresolved product ID(s) "
             f"{rendered}. product_ids may only contain canonical product IDs "
             "explicitly supplied by the user or previously resolved in conversation "
-            "context. Do not construct product IDs from product names. For a named "
-            "single product, use product_overview with the product name so it can be "
-            "resolved server-side."
+            "context or resolved by the current-turn product resolver. Do not "
+            "construct product IDs from product names. Put the exact named product "
+            "in ToolPlan.product_query so deterministic entity resolution can supply "
+            "the canonical ID before analytics execution."
         )
     ]
 

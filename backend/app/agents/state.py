@@ -28,6 +28,7 @@ class StateKeys:
     VALIDATION_ERRORS_TEXT = "validation_errors_text"
     RETRY_COUNT = "retry_count"
     TOOL_PLAN = "tool_plan"
+    RESOLVED_PRODUCT_JSON = "resolved_product_json"
 
     TOOL_RESULTS = "tool_results"
     SUCCESSFUL_RESULTS_JSON = "successful_results_json"
@@ -53,7 +54,11 @@ ROUTE_VISUALIZATION_ONLY = "visualization_only"
 ROUTE_ANALYSIS_ONLY = "analysis_only"
 ROUTE_CONVERSATION = "conversation"
 
+PRODUCT_RESOLVER_TOOL_NAME = "resolve_product"
+
 ROUTE_RETRY = "retry"
+ROUTE_RESOLUTION_PROCEED = "resolution_proceed"
+ROUTE_RESOLUTION_STOP = "resolution_stop"
 ROUTE_PROCEED = "proceed"
 ROUTE_DO_VIZ = "do_viz"
 ROUTE_SKIP_VIZ = "skip_viz"
@@ -63,6 +68,7 @@ ROUTE_SKIP_ANALYTICS = "skip_analytics"
 
 TRANSIENT_STATE_RESET = {
     StateKeys.TOOL_PLAN: None,
+    StateKeys.RESOLVED_PRODUCT_JSON: None,
     StateKeys.TOOL_RESULTS: [],
     StateKeys.SUCCESSFUL_RESULTS_JSON: "[]",
     StateKeys.VALIDATION_ERRORS_TEXT: "",
@@ -93,3 +99,11 @@ class ExecutedToolCall(BaseModel):
     @property
     def is_success(self) -> bool:
         return self.error is None and self.status == "success" and self.result is not None
+
+    @property
+    def is_business_result(self) -> bool:
+        return (
+            self.error is None
+            and self.status in {"success", "no_data", "not_found", "ambiguous"}
+            and self.result is not None
+        )

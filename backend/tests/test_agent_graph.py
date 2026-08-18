@@ -15,6 +15,7 @@ from app.schemas.agent import RouteDecision, ToolPlan
 from app.schemas.visualization import VisualizationPlan
 from tests.conftest import (
     FakeMcpClient,
+    make_analytics_node,
     make_planner_node,
     make_router_node,
     make_visualization_node,
@@ -302,6 +303,15 @@ async def test_unresolved_product_id_retries_with_product_overview():
     mcp = FakeMcpClient(
         call_results={
             "sales_summary": rank_result(structured=bad_summary),
+            "resolve_product": rank_result(structured={
+                "status": "success",
+                "product": {
+                    "type": "product",
+                    "id": "NORD-SHT-025",
+                    "name": "Oxford Button-Down",
+                },
+                "candidates": [],
+            }),
             "product_overview": rank_result(structured=good_overview),
         }
     )
@@ -315,6 +325,7 @@ async def test_unresolved_product_id_retries_with_product_overview():
 
     assert [name for name, _ in mcp.calls] == [
         "sales_summary",
+        "resolve_product",
         "product_overview",
     ]
     assert state["_planner_calls"] == 2
@@ -470,3 +481,161 @@ def test_agents_expose_strict_output_schemas():
     assert build_planner_agent(_model()).output_schema is ToolPlan
     assert build_visualization_agent(_model()).output_schema is VisualizationPlan
     assert build_analytics_agent(_model()).output_schema is None
+
+
+async def test_simple_visualization_backed_request_skips_analytics_prose():
+    mcp = FakeMcpClient(
+        call_results={"sales_rank": rank_result()}
+    )
+
+    state = await run_workflow(
+        mcp=mcp,
+        router=make_router_node("new_data"),
+        visualization=make_visualization_node(
+            [{
+                "dataset": "c1:ranking",
+                "type": "bar_chart",
+                "title": "Top products",
+                "x_key": "entity_name",
+                "y_keys": ["units"],
+            }]
+        ),
+        analytics=make_analytics_node(
+            "THIS SHOULD NOT BE RENDERED"
+        ),
+        user_message=(
+            "What were our 5 best-selling products "
+            "in Q1 2026?"
+        ),
+    )
+
+    assert len(state["response"]["visualizations"]) == 1
+    assert state["response"]["message"] == ""
+    assert state.get(StateKeys.ANALYSIS) is None
+
+
+async def test_swedish_simple_visualization_request_skips_analytics_prose():
+    mcp = FakeMcpClient(
+        call_results={"sales_rank": rank_result()}
+    )
+
+    state = await run_workflow(
+        mcp=mcp,
+        router=make_router_node("new_data"),
+        visualization=make_visualization_node(
+            [{
+                "dataset": "c1:ranking",
+                "type": "bar_chart",
+                "title": "Topp 5 produkter",
+                "x_key": "entity_name",
+                "y_keys": ["units"],
+            }]
+        ),
+        analytics=make_analytics_node(
+            "DETTA SKA INTE VISAS"
+        ),
+        user_message=(
+            "Vilka var våra 5 bäst säljande produkter "
+            "under Q1 2026?"
+        ),
+        state_overrides={
+            StateKeys.UI_LANGUAGE: "sv",
+        },
+    )
+
+    assert len(state["response"]["visualizations"]) == 1
+    assert state["response"]["message"] == ""
+    assert state.get(StateKeys.ANALYSIS) is None
+
+
+async def test_explicit_interpretation_still_runs_analytics_with_visualization():
+    mcp = FakeMcpClient(
+        call_results={"sales_rank": rank_result()}
+    )
+
+    state = await run_workflow(
+        mcp=mcp,
+        router=make_router_node("new_data"),
+        visualization=make_visualization_node(
+            [{
+                "dataset": "c1:ranking",
+                "type": "bar_chart",
+                "title": "Top products",
+                "x_key": "entity_name",
+                "y_keys": ["units"],
+            }]
+        ),
+        analytics=make_analytics_node(
+            "The leading product stands out clearly."
+        ),
+        user_message=(
+            "Why does the leading product stand out "
+            "in Q1 2026?"
+        ),
+    )
+
+    assert len(state["response"]["visualizations"]) == 1
+    assert (
+        state["response"]["message"]
+        == "The leading product stands out clearly."
+    )
+
+
+async def test_swedish_interpretation_wording_runs_analytics():
+    mcp = FakeMcpClient(
+        call_results={"sales_rank": rank_result()}
+    )
+
+    state = await run_workflow(
+        mcp=mcp,
+        router=make_router_node("new_data"),
+        visualization=make_visualization_node(
+            [{
+                "dataset": "c1:ranking",
+                "type": "bar_chart",
+                "title": "Topp 5 produkter",
+                "x_key": "entity_name",
+                "y_keys": ["units"],
+            }]
+        ),
+        analytics=make_analytics_node(
+            "Den ledande produkten sticker ut."
+        ),
+        user_message=(
+            "Varför sticker den ledande produkten ut "
+            "under Q1 2026?"
+        ),
+        state_overrides={
+            StateKeys.UI_LANGUAGE: "sv",
+        },
+    )
+
+    assert (
+        state["response"]["message"]
+        == "Den ledande produkten sticker ut."
+    )
+
+
+async def test_missing_visualization_keeps_self_contained_analytics_answer():
+    mcp = FakeMcpClient(
+        call_results={"sales_rank": rank_result()}
+    )
+
+    state = await run_workflow(
+        mcp=mcp,
+        router=make_router_node("new_data"),
+        visualization=make_visualization_node([]),
+        analytics=make_analytics_node(
+            "Classic Denim Jacket was the leader."
+        ),
+        user_message=(
+            "What was our best-selling product "
+            "in Q1 2026?"
+        ),
+    )
+
+    assert state["response"]["visualizations"] == []
+    assert (
+        state["response"]["message"]
+        == "Classic Denim Jacket was the leader."
+    )

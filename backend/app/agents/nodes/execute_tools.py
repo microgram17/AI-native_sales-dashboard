@@ -20,7 +20,15 @@ def _coerce_plan(value: Any) -> ToolPlan:
         return ToolPlan.model_validate(value)
     if isinstance(value, str) and value.strip():
         return ToolPlan.model_validate_json(value)
-    return ToolPlan()
+    return ToolPlan(
+        tool_calls=[],
+        product_query=None,
+        requested_grain=None,
+        inherit_period=False,
+        inherit_scope=False,
+        inherit_entity=False,
+        inherit_operation=False,
+    )
 
 
 def build_execute_tools_node(mcp: McpClient) -> BaseNode:
@@ -84,11 +92,21 @@ def build_execute_tools_node(mcp: McpClient) -> BaseNode:
             )
 
         ctx.state[StateKeys.TOOL_RESULTS] = [r.model_dump() for r in results]
-        successful = [
-            {"call_id": r.call_id, "tool_name": r.tool_name, "result": r.result}
+        # Despite the historical state-key name, downstream analytics needs all
+        # recognized business outcomes, not only status="success". This lets it
+        # answer no_data/not_found/ambiguous outcomes without guessing.
+        business_results = [
+            {
+                "call_id": r.call_id,
+                "tool_name": r.tool_name,
+                "result": r.result,
+            }
             for r in results
-            if r.is_success
+            if r.is_business_result
         ]
-        ctx.state[StateKeys.SUCCESSFUL_RESULTS_JSON] = json.dumps(successful)
+        ctx.state[StateKeys.SUCCESSFUL_RESULTS_JSON] = json.dumps(
+            business_results,
+            ensure_ascii=False,
+        )
 
     return node(execute_tools, name="execute_tools")

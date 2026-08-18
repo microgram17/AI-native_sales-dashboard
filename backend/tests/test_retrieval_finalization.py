@@ -20,6 +20,8 @@ def _plan(
                 purpose="test",
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=False,
         inherit_scope=False,
         inherit_entity=False,
@@ -207,6 +209,8 @@ def test_inheritance_flags_are_preserved():
                 purpose="test",
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=True,
         inherit_scope=True,
         inherit_entity=True,
@@ -222,3 +226,94 @@ def test_inheritance_flags_are_preserved():
     assert finalized.inherit_scope is True
     assert finalized.inherit_entity is True
     assert finalized.inherit_operation is True
+
+
+def test_swedish_explicit_top_n_is_finalized():
+    plan = _plan(
+        arguments={
+            "group_by": "product",
+            "rank_by": "net_sales",
+            "limit": 10,
+        }
+    )
+
+    finalized = finalize_retrieval_plan(
+        plan,
+        "Vilka var våra 5 produkter med högst nettoomsättning under Q1 2026?",
+    )
+
+    assert _args(finalized)["limit"] == 5
+    assert _args(finalized)["order"] == "highest"
+
+
+def test_swedish_monthly_request_converts_summary_to_trend():
+    plan = _plan(
+        tool_name="sales_summary",
+        arguments={
+            "period_start": "2026-01-01",
+            "period_end": "2026-12-31",
+        },
+    )
+
+    finalized = finalize_retrieval_plan(
+        plan,
+        "Visa månatliga sålda enheter och nettoomsättning för 2026.",
+    )
+
+    assert finalized.requested_grain == "month"
+    assert finalized.tool_calls[0].tool_name == "sales_trend"
+    assert _args(finalized) == {
+        "grain": "month",
+        "period_start": "2026-01-01",
+        "period_end": "2026-12-31",
+    }
+
+
+def test_product_overview_monthly_conversion_preserves_product_query():
+    plan = ToolPlan(
+        tool_calls=[
+            PlannedToolCallDraft(
+                call_id="1",
+                tool_name="product_overview",
+                arguments_json=json.dumps({
+                    "product": "Oxford Button-Down",
+                    "period_start": "2026-01-01",
+                    "period_end": "2026-03-31",
+                }),
+                purpose="test",
+            )
+        ],
+        product_query=None,
+        requested_grain="month",
+        inherit_period=False,
+        inherit_scope=False,
+        inherit_entity=False,
+        inherit_operation=False,
+    )
+
+    finalized = finalize_retrieval_plan(
+        plan,
+        "Visa Oxford Button-Down månatligt under Q1 2026.",
+    )
+
+    assert finalized.product_query == "Oxford Button-Down"
+    assert finalized.tool_calls[0].tool_name == "sales_trend"
+    assert _args(finalized)["scope"]["product_ids"] == ["Oxford Button-Down"]
+
+
+def test_swedish_number_word_top_n_is_finalized():
+    plan = _plan(
+        arguments={
+            "group_by": "product",
+            "rank_by": "net_sales",
+            "limit": 10,
+        }
+    )
+
+    finalized = finalize_retrieval_plan(
+        plan,
+        "Vilka är våra topp fem produkter efter nettoomsättning?",
+    )
+
+    assert _args(finalized)["limit"] == 5
+    assert _args(finalized)["order"] == "highest"

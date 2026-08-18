@@ -437,3 +437,23 @@ async def test_sales_rank_exposes_population_and_returned_totals(service):
         result.total_population_rank_metric_value
         >= result.returned_rows_rank_metric_value
     )
+
+
+async def test_resolve_product_service_exact_name(service):
+    result = await service.resolve_product(
+        supplier_id=SUPPLIER,
+        product="Minimal Logo Hoodie",
+    )
+    assert result.status == "success"
+    assert result.product is not None
+    assert result.product.id == "NORD-HOD-011"
+
+
+async def test_resolve_product_service_exact_id_is_case_insensitive(service):
+    result = await service.resolve_product(
+        supplier_id=SUPPLIER,
+        product="nord-hod-011",
+    )
+    assert result.status == "success"
+    assert result.product is not None
+    assert result.product.id == "NORD-HOD-011"

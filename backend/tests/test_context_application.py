@@ -98,6 +98,8 @@ def test_turn_2_inherits_q1_online_product_into_monthly_trend():
                 {"grain": "month"},
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=True,
         inherit_scope=True,
         inherit_entity=True,
@@ -135,6 +137,8 @@ def test_turn_3_preserves_monthly_trend_even_if_draft_selects_summary():
                 },
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=False,
         inherit_scope=True,
         inherit_entity=True,
@@ -170,6 +174,8 @@ def test_explicit_physical_channel_overrides_inherited_online():
                 },
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=True,
         inherit_scope=True,
         inherit_entity=True,
@@ -197,6 +203,8 @@ def test_explicit_empty_channels_clears_inherited_channel_filter():
                 },
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=True,
         inherit_scope=True,
         inherit_entity=True,
@@ -217,6 +225,8 @@ def test_entity_can_be_inherited_without_other_scope_filters():
                 {"grain": "month"},
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=True,
         inherit_scope=False,
         inherit_entity=True,
@@ -241,6 +251,8 @@ def test_unrelated_request_with_all_flags_false_is_unchanged():
                 },
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=False,
         inherit_scope=False,
         inherit_entity=False,
@@ -264,6 +276,8 @@ def test_product_overview_inherits_single_product_as_product_argument():
                 {},
             )
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=True,
         inherit_scope=True,
         inherit_entity=True,
@@ -287,6 +301,8 @@ def test_operation_inheritance_is_conservative_for_multi_call_plans():
             _draft("sales_summary", {}, call_id="1"),
             _draft("sales_summary", {}, call_id="2"),
         ],
+        product_query=None,
+        requested_grain=None,
         inherit_period=False,
         inherit_scope=False,
         inherit_entity=False,

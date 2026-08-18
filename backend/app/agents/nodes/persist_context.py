@@ -86,14 +86,35 @@ def _extract_product_entities(
     return _dedupe_entities(entities)
 
 
-def _first_success_value(
-    successful: list[ExecutedToolCall],
+def _first_business_value(
+    results: list[ExecutedToolCall],
     key: str,
 ) -> dict[str, Any] | None:
-    for call in successful:
+    for call in results:
         value = (call.result or {}).get(key)
         if isinstance(value, dict):
             return value
+    return None
+
+
+def _resolved_product_entity(
+    state: dict[str, Any],
+) -> dict[str, Any] | None:
+    value = _load_json(
+        state.get(StateKeys.RESOLVED_PRODUCT_JSON),
+        {},
+    )
+    if (
+        isinstance(value, dict)
+        and value.get("type") == "product"
+        and value.get("id")
+        and value.get("name")
+    ):
+        return {
+            "type": "product",
+            "id": value["id"],
+            "name": value["name"],
+        }
     return None
 
 
@@ -158,6 +179,9 @@ def build_persist_context_node() -> BaseNode:
             ExecutedToolCall.model_validate(result)
             for result in (tool_results or [])
         ]
+        business_results = [
+            result for result in results if result.is_business_result
+        ]
         successful = [result for result in results if result.is_success]
 
         previous_entities = _load_json(
@@ -169,37 +193,71 @@ def build_persist_context_node() -> BaseNode:
 
         last_request = _last_request_payload(results)
         if last_request is not None:
-            ctx.state[StateKeys.CTX_LAST_REQUEST_JSON] = json.dumps(last_request)
+            ctx.state[StateKeys.CTX_LAST_REQUEST_JSON] = json.dumps(
+                last_request,
+                ensure_ascii=False,
+            )
 
-        # Reusable raw results always belong to the latest analytical turn.
-        # A no-data turn therefore has no reusable result, but it must not wipe
-        # the stable semantic context established by an earlier successful turn.
+        # Only successful analytical data is reusable by later reuse-data routes.
+        # Business outcomes such as no_data remain available for the current
+        # response but are not treated as reusable raw datasets.
         ctx.state[StateKeys.CTX_HAS_RESULTS] = bool(successful)
         ctx.state[StateKeys.CTX_TOOL_CALLS_JSON] = [
             result.model_dump(mode="json") for result in results
         ]
-        ctx.state[StateKeys.CTX_RESULTS_JSON] = (
-            successful_results_json if successful else "[]"
+        successful_payload = [
+            {
+                "call_id": result.call_id,
+                "tool_name": result.tool_name,
+                "result": result.result,
+            }
+            for result in successful
+        ]
+        ctx.state[StateKeys.CTX_RESULTS_JSON] = json.dumps(
+            successful_payload,
+            ensure_ascii=False,
         )
 
-        if not successful:
-            return
-
+        # Semantic context may still be established by a no_data result because
+        # effective period/scope are known, and named-product resolution happens
+        # before analytics. This makes follow-ups stable even when the selected
+        # product has no sales in the requested period.
         new_entities = _extract_product_entities(successful)
-        new_period = _first_success_value(successful, "effective_period")
-        new_scope = _first_success_value(successful, "effective_scope")
+        resolved_product = _resolved_product_entity(ctx.state)
+        if resolved_product is not None:
+            new_entities.insert(0, resolved_product)
+        new_entities = _dedupe_entities(new_entities)
 
-        merged_entities = _entities_for_new_scope(
-            previous_entities,
-            new_entities,
-            new_scope,
+        new_period = _first_business_value(
+            business_results,
+            "effective_period",
         )
-        ctx.state[StateKeys.CTX_ENTITIES_JSON] = json.dumps(merged_entities)
+        new_scope = _first_business_value(
+            business_results,
+            "effective_scope",
+        )
+
+        if new_entities or new_scope is not None:
+            merged_entities = _entities_for_new_scope(
+                previous_entities,
+                new_entities,
+                new_scope,
+            )
+            ctx.state[StateKeys.CTX_ENTITIES_JSON] = json.dumps(
+                merged_entities,
+                ensure_ascii=False,
+            )
 
         if new_period is not None:
-            ctx.state[StateKeys.CTX_PERIOD_JSON] = json.dumps(new_period)
+            ctx.state[StateKeys.CTX_PERIOD_JSON] = json.dumps(
+                new_period,
+                ensure_ascii=False,
+            )
 
         if new_scope is not None:
-            ctx.state[StateKeys.CTX_SCOPE_JSON] = json.dumps(new_scope)
+            ctx.state[StateKeys.CTX_SCOPE_JSON] = json.dumps(
+                new_scope,
+                ensure_ascii=False,
+            )
 
     return node(persist_context, name="persist_context")

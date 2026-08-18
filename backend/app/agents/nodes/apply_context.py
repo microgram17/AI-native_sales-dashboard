@@ -58,7 +58,15 @@ def _coerce_plan(value: Any) -> ToolPlan:
         return ToolPlan.model_validate(value)
     if isinstance(value, str) and value.strip():
         return ToolPlan.model_validate_json(value)
-    return ToolPlan()
+    return ToolPlan(
+        tool_calls=[],
+        product_query=None,
+        requested_grain=None,
+        inherit_period=False,
+        inherit_scope=False,
+        inherit_entity=False,
+        inherit_operation=False,
+    )
 
 
 def _load_json(value: Any, default: Any) -> Any:
@@ -409,6 +417,8 @@ def apply_context_to_plan(
 
     return ToolPlan(
         tool_calls=resolved_calls,
+        product_query=plan.product_query,
+        requested_grain=plan.requested_grain,
         inherit_period=plan.inherit_period,
         inherit_scope=plan.inherit_scope,
         inherit_entity=plan.inherit_entity,

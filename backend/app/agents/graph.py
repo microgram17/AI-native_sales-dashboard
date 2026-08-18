@@ -5,6 +5,7 @@ New-data path:
     planner
       -> apply_context
       -> finalize_retrieval_plan
+      -> resolve_entities
       -> execute
       -> validate
 
@@ -33,6 +34,7 @@ from app.agents.nodes.normalize_visualizations import (
     build_normalize_visualizations_node,
 )
 from app.agents.nodes.persist_context import build_persist_context_node
+from app.agents.nodes.resolve_entities import build_resolve_entities_node
 from app.agents.nodes.validate_results import build_validate_results_node
 from app.agents.nodes.validate_visualizations import (
     build_validate_visualizations_node,
@@ -45,6 +47,8 @@ from app.agents.state import (
     ROUTE_NEW_DATA,
     ROUTE_PROCEED,
     ROUTE_RETRY,
+    ROUTE_RESOLUTION_PROCEED,
+    ROUTE_RESOLUTION_STOP,
     ROUTE_REUSE_DATA,
     ROUTE_SKIP_ANALYTICS,
     ROUTE_SKIP_VIZ,
@@ -68,6 +72,7 @@ def build_workflow(
     planner_node = node(planner, name="planner")
     context_node = build_apply_context_node()
     retrieval_node = build_finalize_retrieval_plan_node()
+    entity_resolution_node = build_resolve_entities_node(mcp)
     executor_node = build_execute_tools_node(mcp)
     validator_node = build_validate_results_node()
     persist_node = build_persist_context_node()
@@ -118,7 +123,17 @@ def build_workflow(
         # retrieval-finalized before execution, including planner retries.
         Edge(from_node=planner_node, to_node=context_node),
         Edge(from_node=context_node, to_node=retrieval_node),
-        Edge(from_node=retrieval_node, to_node=executor_node),
+        Edge(from_node=retrieval_node, to_node=entity_resolution_node),
+        Edge(
+            from_node=entity_resolution_node,
+            to_node=executor_node,
+            route=ROUTE_RESOLUTION_PROCEED,
+        ),
+        Edge(
+            from_node=entity_resolution_node,
+            to_node=analytics_gate_node,
+            route=ROUTE_RESOLUTION_STOP,
+        ),
         Edge(from_node=executor_node, to_node=validator_node),
         Edge(
             from_node=validator_node,

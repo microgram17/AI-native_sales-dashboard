@@ -19,6 +19,7 @@ from app.contracts.sales import (
     MetricChanges,
     MetricSnapshot,
     ProductOverviewResult,
+    ProductResolutionResult,
     ProductOverviewScope,
     RankBy,
     RankedRow,
@@ -478,8 +479,11 @@ class SalesAnalyticsService:
             supplier_id, period_start, period_end
         )
 
-        resolution = await self._resolve_product(supplier_id, product)
-        if resolution["status"] == "not_found":
+        resolution = await self.resolve_product(
+            supplier_id=supplier_id,
+            product=product,
+        )
+        if resolution.status == "not_found":
             warnings.append(f"No product matched '{product}'.")
             return ProductOverviewResult(
                 status="not_found",
@@ -487,7 +491,7 @@ class SalesAnalyticsService:
                 effective_scope=scope,
                 warnings=warnings,
             )
-        if resolution["status"] == "ambiguous":
+        if resolution.status == "ambiguous":
             warnings.append(
                 f"'{product}' matched multiple products; refine using a product_id."
             )
@@ -496,12 +500,16 @@ class SalesAnalyticsService:
                 effective_period=effective,
                 effective_scope=scope,
                 warnings=warnings,
-                candidates=resolution["candidates"],
+                candidates=resolution.candidates,
             )
 
-        product_id = resolution["product_id"]
-        product_name = resolution["product_name"]
-        product_entity = AnalyticsEntity(type="product", id=product_id, name=product_name)
+        product_entity = resolution.product
+        if product_entity is None or product_entity.id is None:
+            raise AnalyticsRequestError(
+                "Product resolution succeeded without a canonical product ID."
+            )
+
+        product_id = product_entity.id
 
         # Overview is scoped to this one product; map the model-visible filters
         # (channels/cities/store_ids) onto an internal SalesScope for the repository.
@@ -638,41 +646,80 @@ class SalesAnalyticsService:
             )
         return result
 
-    async def _resolve_product(self, supplier_id: str, product: str) -> dict[str, Any]:
+    async def resolve_product(
+        self,
+        *,
+        supplier_id: str,
+        product: str,
+    ) -> ProductResolutionResult:
+        """Resolve one product reference to a canonical supplier-owned product.
+
+        Resolution order is deterministic:
+        1. exact canonical ID (case-insensitive)
+        2. exact product name (case-insensitive)
+        3. partial product name
+
+        Ambiguous partial/exact-name matches are never guessed.
+        """
+
+        query = product.strip()
+        if not query:
+            return ProductResolutionResult(status="not_found")
+
         exact_id = await self._repo.resolve_product_exact_id(
-            supplier_id=supplier_id, value=product
+            supplier_id=supplier_id,
+            value=query,
         )
         if exact_id is not None:
-            return {
-                "status": "success",
-                "product_id": exact_id["product_id"],
-                "product_name": exact_id["product_name"],
-            }
+            return ProductResolutionResult(
+                status="success",
+                product=AnalyticsEntity(
+                    type="product",
+                    id=exact_id["product_id"],
+                    name=exact_id["product_name"],
+                ),
+            )
 
         exact_name = await self._repo.resolve_product_exact_name(
-            supplier_id=supplier_id, value=product
+            supplier_id=supplier_id,
+            value=query,
         )
         if len(exact_name) == 1:
-            return {
-                "status": "success",
-                "product_id": exact_name[0]["product_id"],
-                "product_name": exact_name[0]["product_name"],
-            }
+            row = exact_name[0]
+            return ProductResolutionResult(
+                status="success",
+                product=AnalyticsEntity(
+                    type="product",
+                    id=row["product_id"],
+                    name=row["product_name"],
+                ),
+            )
         if len(exact_name) > 1:
-            return {"status": "ambiguous", "candidates": self._candidates(exact_name)}
+            return ProductResolutionResult(
+                status="ambiguous",
+                candidates=self._candidates(exact_name),
+            )
 
         partial = await self._repo.resolve_product_partial(
-            supplier_id=supplier_id, value=product
+            supplier_id=supplier_id,
+            value=query,
         )
         if not partial:
-            return {"status": "not_found"}
+            return ProductResolutionResult(status="not_found")
         if len(partial) == 1:
-            return {
-                "status": "success",
-                "product_id": partial[0]["product_id"],
-                "product_name": partial[0]["product_name"],
-            }
-        return {"status": "ambiguous", "candidates": self._candidates(partial)}
+            row = partial[0]
+            return ProductResolutionResult(
+                status="success",
+                product=AnalyticsEntity(
+                    type="product",
+                    id=row["product_id"],
+                    name=row["product_name"],
+                ),
+            )
+        return ProductResolutionResult(
+            status="ambiguous",
+            candidates=self._candidates(partial),
+        )
 
     @staticmethod
     def _candidates(rows: list[dict[str, Any]]) -> list[AnalyticsEntity]:

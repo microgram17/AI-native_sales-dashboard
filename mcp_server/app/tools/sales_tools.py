@@ -1,4 +1,4 @@
-"""The four public MCP analytics tools.
+"""Public MCP analytics and entity-resolution tools.
 
 Each tool validates model-visible arguments, resolves the trusted supplier
 context server-side (supplier_id is never a model-visible argument), calls the
@@ -19,6 +19,7 @@ from app.context.supplier_context import SupplierContextError, SupplierContextRe
 from app.contracts.sales import (
     GroupBy,
     ProductOverviewResult,
+    ProductResolutionResult,
     ProductOverviewScope,
     RankBy,
     RankOrder,
@@ -59,6 +60,35 @@ def register_sales_tools(
     service: SalesAnalyticsService,
     supplier_resolver: SupplierContextResolver,
 ) -> None:
+    @mcp.tool()
+    async def resolve_product(
+        ctx: Context,
+        product: str,
+    ) -> ProductResolutionResult:
+        """Resolve one product reference to its canonical supplier-scoped ID.
+
+        This is an entity-resolution capability used before analytical queries
+        that need SalesScope.product_ids. It performs no sales aggregation.
+
+        Parameters:
+        - product: canonical product ID, exact product name, or partial product
+          name.
+
+        Resolution is deterministic: exact ID, then exact case-insensitive name,
+        then partial name. A multiple match returns status="ambiguous" with
+        candidates; no match returns status="not_found". It never guesses.
+
+        supplier_id is resolved from trusted MCP context and is never exposed as
+        a model-visible argument.
+        """
+        supplier_id = supplier_resolver.resolve(ctx)
+        return await _run(
+            service.resolve_product(
+                supplier_id=supplier_id,
+                product=product,
+            )
+        )
+
     @mcp.tool()
     async def sales_summary(
         ctx: Context,

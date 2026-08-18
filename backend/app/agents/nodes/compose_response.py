@@ -1,4 +1,9 @@
-"""Deterministic response composer node (no LLM call)."""
+"""Deterministic response composer node (no LLM call).
+
+A validated visualization is allowed to be the complete assistant answer. When
+the response-policy gate intentionally skips analytics, message therefore stays
+empty instead of adding generic filler such as "see the visualization below".
+"""
 
 from __future__ import annotations
 
@@ -9,8 +14,15 @@ from google.adk.agents.context import Context
 from google.adk.workflow import BaseNode, node
 
 from app.agents.state import ExecutedToolCall, StateKeys
-from app.schemas.agent import AgentQueryResponse, Dataset, ToolCallInfo
-from app.schemas.visualization import VisualizationDataset, VisualizationPlan
+from app.schemas.agent import (
+    AgentQueryResponse,
+    Dataset,
+    ToolCallInfo,
+)
+from app.schemas.visualization import (
+    VisualizationDataset,
+    VisualizationPlan,
+)
 
 
 def _coerce_viz(value: Any) -> VisualizationPlan:
@@ -28,6 +40,7 @@ def _coerce_viz_datasets(
 ) -> list[VisualizationDataset]:
     if value is None:
         return []
+
     raw: Any = value
     if isinstance(value, str):
         if not value.strip():
@@ -36,9 +49,14 @@ def _coerce_viz_datasets(
             raw = json.loads(value)
         except json.JSONDecodeError:
             return []
+
     if not isinstance(raw, list):
         return []
-    return [VisualizationDataset.model_validate(item) for item in raw]
+
+    return [
+        VisualizationDataset.model_validate(item)
+        for item in raw
+    ]
 
 
 def build_compose_response_node() -> BaseNode:
@@ -49,20 +67,39 @@ def build_compose_response_node() -> BaseNode:
         visualization_datasets_json: str = "[]",
         analysis: str | None = None,
         conversation_id: str = "",
+        ui_language: str = "en",
     ) -> None:
-        results = [ExecutedToolCall.model_validate(r) for r in (tool_results or [])]
+        results = [
+            ExecutedToolCall.model_validate(result)
+            for result in (tool_results or [])
+        ]
         viz = _coerce_viz(visualization_plan)
-        viz_datasets = _coerce_viz_datasets(visualization_datasets_json)
+        viz_datasets = _coerce_viz_datasets(
+            visualization_datasets_json
+        )
 
-        valid_dataset_ids = {dataset.id for dataset in viz_datasets}
-        specs = [spec for spec in viz.visualizations if spec.dataset in valid_dataset_ids]
+        valid_dataset_ids = {
+            dataset.id
+            for dataset in viz_datasets
+        }
+        specs = [
+            spec
+            for spec in viz.visualizations
+            if spec.dataset in valid_dataset_ids
+        ]
 
+        # Empty prose is intentional when a visualization completely answers a
+        # straightforward request. ChatMessage already supports rendering a
+        # visualization without a text block.
         message = (analysis or "").strip()
-        if not message:
+
+        # Only fall back to text when neither prose nor a valid visualization
+        # exists. Never add generic filler above a visualization.
+        if not message and not specs:
             message = (
-                "Updated the visualization using the existing data."
-                if specs
-                else "No analysis was produced."
+                "Inget svar kunde genereras."
+                if ui_language == "sv"
+                else "No response was produced."
             )
 
         response = AgentQueryResponse(
@@ -70,28 +107,33 @@ def build_compose_response_node() -> BaseNode:
             message=message,
             tool_calls=[
                 ToolCallInfo(
-                    call_id=r.call_id,
-                    tool_name=r.tool_name,
-                    arguments=r.arguments,
-                    purpose=r.purpose,
-                    status=r.status,
-                    error=r.error,
+                    call_id=result.call_id,
+                    tool_name=result.tool_name,
+                    arguments=result.arguments,
+                    purpose=result.purpose,
+                    status=result.status,
+                    error=result.error,
                 )
-                for r in results
+                for result in results
             ],
             datasets=[
                 Dataset(
-                    call_id=r.call_id,
-                    tool_name=r.tool_name,
-                    status=r.status or "success",
-                    result=r.result or {},
+                    call_id=result.call_id,
+                    tool_name=result.tool_name,
+                    status=result.status or "success",
+                    result=result.result or {},
                 )
-                for r in results
-                if r.is_success
+                for result in results
+                if result.is_success
             ],
             visualization_datasets=viz_datasets,
             visualizations=specs,
         )
-        ctx.state[StateKeys.RESPONSE] = response.model_dump(mode="json")
+        ctx.state[StateKeys.RESPONSE] = response.model_dump(
+            mode="json"
+        )
 
-    return node(compose_response, name="compose_response")
+    return node(
+        compose_response,
+        name="compose_response",
+    )

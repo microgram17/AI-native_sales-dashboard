@@ -1,13 +1,12 @@
 """Deterministically enforce high-confidence retrieval invariants.
 
-This node runs after conversational context has been applied and before MCP
-execution. It intentionally has a narrow responsibility: correct ranking
-cardinality and ranking direction when the user's wording makes those semantics
-unambiguous.
+This node runs after conversational context has been applied and before entity
+resolution / MCP execution. It owns only high-confidence retrieval invariants:
+ranking cardinality/direction and explicit output time grain. If an explicit
+time-series grain is requested, aggregate summary/product-overview drafts are
+compiled to sales_trend before execution.
 
-It does NOT choose tools, metrics, periods, scopes, entities, or visualization
-types. Those remain responsibilities of the planner/context/visualization
-layers.
+It does not resolve database identities or choose visualizations.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ from google.adk.agents.context import Context
 from google.adk.workflow import BaseNode, node
 
 from app.agents.state import StateKeys
-from app.schemas.agent import PlannedToolCallDraft, ToolPlan
+from app.schemas.agent import PlannedToolCallDraft, RequestedGrain, ToolPlan
 
 
 _NUMBER_WORDS = {
@@ -45,6 +44,27 @@ _NUMBER_WORDS = {
     "eighteen": 18,
     "nineteen": 19,
     "twenty": 20,
+    "en": 1,
+    "ett": 1,
+    "två": 2,
+    "tre": 3,
+    "fyra": 4,
+    "fem": 5,
+    "sex": 6,
+    "sju": 7,
+    "åtta": 8,
+    "nio": 9,
+    "tio": 10,
+    "elva": 11,
+    "tolv": 12,
+    "tretton": 13,
+    "fjorton": 14,
+    "femton": 15,
+    "sexton": 16,
+    "sjutton": 17,
+    "arton": 18,
+    "nitton": 19,
+    "tjugo": 20,
 }
 
 _COUNT_TOKEN = (
@@ -67,39 +87,88 @@ _EXPLICIT_COUNT_PATTERNS = (
         r"(?:products?|categories|category|stores?|cities|city|channels?)\b",
         re.IGNORECASE,
     ),
+    # Swedish: "topp 5", "botten 5"
+    re.compile(
+        r"\b(?:topp|botten)\s+(?P<count>\w+)\b",
+        re.IGNORECASE,
+    ),
+    # Swedish: "5 produkter med högst ...", "5 butiker med lägst ..."
+    re.compile(
+        r"\b(?P<count>\w+)\s+"
+        r"(?:produkter?|kategorier?|butiker?|städer?|kanaler?)"
+        r"[^?.!\n]{0,45}\b(?:högst|lägst|bäst|sämst)\b",
+        re.IGNORECASE,
+    ),
 )
 
 _LOW_ORDER_RE = re.compile(
-    r"\b(?:worst(?:[-\s]selling)?|lowest|bottom|least)\b",
+    r"\b(?:worst(?:[-\s]selling)?|lowest|bottom|least|sämst|lägst|botten|minst)\b",
     re.IGNORECASE,
 )
 _HIGH_ORDER_RE = re.compile(
-    r"\b(?:best(?:[-\s]selling)?|highest|top|most)\b",
+    r"\b(?:best(?:[-\s]selling)?|highest|top|most|bäst|högst|topp|flest|mest)\b",
     re.IGNORECASE,
 )
 
 _COMPARISON_RE = re.compile(
-    r"\b(?:compare|comparison|versus|vs\.?|breakdown|break\s+down)\b",
+    r"\b(?:compare|comparison|versus|vs\.?|breakdown|break\s+down|jämför|jämförelse|uppdelning)\b",
     re.IGNORECASE,
 )
 
 _GROUP_SINGULAR = {
-    "product": "product",
-    "category": "category",
-    "store": "store",
-    "city": "city",
-    "channel": "channel",
+    "product": r"(?:product|produkt)",
+    "category": r"(?:category|kategori)",
+    "store": r"(?:store|butik)",
+    "city": r"(?:city|stad)",
+    "channel": r"(?:channel|kanal)",
 }
 
 _RANK_CUE = (
     r"(?:best(?:[-\s]selling)?|worst(?:[-\s]selling)?|highest|lowest|"
-    r"top|bottom|most|least)"
+    r"top|bottom|most|least|bäst|sämst|högst|lägst|topp|botten|flest|minst)"
+)
+
+_GRAIN_PATTERNS: tuple[tuple[RequestedGrain, re.Pattern[str]], ...] = (
+    (
+        "month",
+        re.compile(
+            r"\b(?:monthly|per\s+month|month\s+by\s+month|"
+            r"månatlig(?:a)?|månadsvis|per\s+månad)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "week",
+        re.compile(
+            r"\b(?:weekly|per\s+week|week\s+by\s+week|"
+            r"veckovis|per\s+vecka)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "day",
+        re.compile(
+            r"\b(?:daily|per\s+day|day\s+by\s+day|"
+            r"daglig(?:a)?|dagligen|per\s+dag)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "quarter",
+        re.compile(
+            r"\b(?:quarterly|per\s+quarter|quarter\s+by\s+quarter|"
+            r"kvartalsvis|per\s+kvartal)\b",
+            re.IGNORECASE,
+        ),
+    ),
 )
 
 
 def _empty_plan() -> ToolPlan:
     return ToolPlan(
         tool_calls=[],
+        product_query=None,
+        requested_grain=None,
         inherit_period=False,
         inherit_scope=False,
         inherit_entity=False,
@@ -180,20 +249,65 @@ def _is_singular_superlative(
     if _COMPARISON_RE.search(message):
         return False
 
-    escaped_noun = re.escape(noun)
+    noun_pattern = noun
 
     cue_before_noun = re.search(
-        rf"\b{_RANK_CUE}\b[^?.!\n]{{0,60}}\b{escaped_noun}\b",
+        rf"\b{_RANK_CUE}\b[^?.!\n]{{0,60}}\b{noun_pattern}\b",
         message,
         re.IGNORECASE,
     )
     noun_before_cue = re.search(
-        rf"\b{escaped_noun}\b[^?.!\n]{{0,60}}\b{_RANK_CUE}\b",
+        rf"\b{noun_pattern}\b[^?.!\n]{{0,60}}\b{_RANK_CUE}\b",
         message,
         re.IGNORECASE,
     )
 
     return cue_before_noun is not None or noun_before_cue is not None
+
+
+def _requested_grain_from_message(
+    message: str,
+) -> RequestedGrain | None:
+    for grain, pattern in _GRAIN_PATTERNS:
+        if pattern.search(message):
+            return grain
+    return None
+
+
+def _convert_to_trend(
+    tool_name: str,
+    arguments: dict[str, Any],
+    grain: RequestedGrain,
+) -> tuple[str, dict[str, Any]]:
+    """Make explicit time-series requests use sales_trend when safe."""
+
+    out = deepcopy(arguments)
+
+    if tool_name == "sales_trend":
+        out["grain"] = grain
+        return tool_name, out
+
+    if tool_name not in {"sales_summary", "product_overview"}:
+        return tool_name, out
+
+    trend_args: dict[str, Any] = {"grain": grain}
+
+    for key in ("period_start", "period_end"):
+        if key in out:
+            trend_args[key] = deepcopy(out[key])
+
+    scope = deepcopy(out.get("scope")) if isinstance(out.get("scope"), dict) else {}
+
+    # A product_overview may already contain an inherited canonical product
+    # argument. Preserve it as a product scope when converting to a trend.
+    product = out.get("product")
+    if tool_name == "product_overview" and isinstance(product, str) and product.strip():
+        scope["product_ids"] = [product.strip()]
+
+    if scope:
+        trend_args["scope"] = scope
+
+    return "sales_trend", trend_args
 
 
 def _finalize_rank_arguments(
@@ -225,12 +339,36 @@ def finalize_retrieval_plan(
     """Return a plan with deterministic retrieval invariants applied."""
 
     finalized_calls: list[PlannedToolCallDraft] = []
+    product_query = plan.product_query
+    requested_grain = (
+        _requested_grain_from_message(user_message)
+        or plan.requested_grain
+    )
 
     for draft in plan.tool_calls:
         call = draft.to_call()
+        tool_name = call.tool_name
         arguments = deepcopy(call.arguments)
 
-        if call.tool_name == "sales_rank":
+        # Backward-compatible safety: if the planner chose product_overview and
+        # supplied a product argument but forgot product_query, promote that
+        # argument into the semantic entity field before any tool conversion.
+        if (
+            product_query is None
+            and tool_name == "product_overview"
+            and isinstance(arguments.get("product"), str)
+            and arguments["product"].strip()
+        ):
+            product_query = arguments["product"].strip()
+
+        if requested_grain is not None:
+            tool_name, arguments = _convert_to_trend(
+                tool_name,
+                arguments,
+                requested_grain,
+            )
+
+        if tool_name == "sales_rank":
             arguments = _finalize_rank_arguments(
                 arguments,
                 user_message,
@@ -239,7 +377,7 @@ def finalize_retrieval_plan(
         finalized_calls.append(
             PlannedToolCallDraft(
                 call_id=call.call_id,
-                tool_name=call.tool_name,
+                tool_name=tool_name,
                 arguments_json=json.dumps(
                     arguments,
                     separators=(",", ":"),
@@ -251,6 +389,8 @@ def finalize_retrieval_plan(
 
     return ToolPlan(
         tool_calls=finalized_calls,
+        product_query=product_query,
+        requested_grain=requested_grain,
         inherit_period=plan.inherit_period,
         inherit_scope=plan.inherit_scope,
         inherit_entity=plan.inherit_entity,

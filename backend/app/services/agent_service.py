@@ -17,7 +17,11 @@ from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService
 from google.genai import types
 
-from app.agents.state import TRANSIENT_STATE_RESET, StateKeys
+from app.agents.state import (
+    PRODUCT_RESOLVER_TOOL_NAME,
+    TRANSIENT_STATE_RESET,
+    StateKeys,
+)
 from app.config import Settings
 from app.integrations.mcp.client import McpClient
 from app.integrations.mcp.context_token import mint_mcp_context_token
@@ -189,6 +193,9 @@ class AgentService:
             prior_state = {}
 
         tools = await self._mcp.list_tools(token=token)
+        # resolve_product is an infrastructure capability used by the
+        # deterministic entity-resolution stage. Keep it available to the
+        # workflow, but do not expose it to the planner as an analytical tool.
         catalog = [
             {
                 "name": tool.name,
@@ -196,6 +203,7 @@ class AgentService:
                 "input_schema": tool.input_schema,
             }
             for tool in tools
+            if tool.name != PRODUCT_RESOLVER_TOOL_NAME
         ]
 
         state_delta = {
@@ -247,5 +255,9 @@ class AgentService:
 
         return AgentQueryResponse(
             conversation_id=conversation_id,
-            message="No response was produced.",
+            message=(
+                "Inget svar kunde genereras."
+                if request.language == "sv"
+                else "No response was produced."
+            ),
         )

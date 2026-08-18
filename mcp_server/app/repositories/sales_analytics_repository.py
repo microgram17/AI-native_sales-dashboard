@@ -323,7 +323,10 @@ class SalesAnalyticsRepository:
         stmt = select(
             products.c.product_id, products.c.product_name
         ).where(
-            and_(products.c.supplier_id == supplier_id, products.c.product_id == value)
+            and_(
+                products.c.supplier_id == supplier_id,
+                func.lower(products.c.product_id) == value.lower(),
+            )
         )
         return await self._fetch_one(stmt)
 
@@ -341,13 +344,18 @@ class SalesAnalyticsRepository:
     async def resolve_product_partial(
         self, *, supplier_id: str, value: str, limit: int = 10
     ) -> list[dict[str, Any]]:
-        pattern = f"%{value}%"
+        escaped = (
+            value.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        pattern = f"%{escaped}%"
         stmt = (
             select(products.c.product_id, products.c.product_name)
             .where(
                 and_(
                     products.c.supplier_id == supplier_id,
-                    products.c.product_name.ilike(pattern),
+                    products.c.product_name.ilike(pattern, escape="\\"),
                 )
             )
             .order_by(products.c.product_name.asc())
