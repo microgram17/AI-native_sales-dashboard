@@ -37,7 +37,10 @@ async def test_new_trend_request_executes_trend_and_builds_line_chart():
     assert mcp.calls[0][1]["grain"] == "month"
 
     response = state[StateKeys.RESPONSE]
-    assert response["message"] == ""
+    assert response["message"] == (
+        "Här är den månatliga utvecklingen för sålda enheter och "
+        "nettoomsättning under 2026."
+    )
     assert response["visualizations"][0]["type"] == "line_chart"
     assert response["visualizations"][0]["secondary_y_keys"] == ["net_sales"]
 
@@ -83,7 +86,9 @@ async def test_ranking_gets_bar_chart_without_duplicate_analytics():
     )
 
     response = state[StateKeys.RESPONSE]
-    assert response["message"] == ""
+    assert response["message"]
+    assert response["message"] != "SHOULD NOT APPEAR"
+    assert "Windbreaker Jacket" in response["message"]
     assert response["visualizations"][0]["type"] == "bar_chart"
 
 

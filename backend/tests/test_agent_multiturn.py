@@ -158,15 +158,17 @@ async def test_online_then_physical_followups_preserve_trend_period_and_metrics(
     assert trend_calls[2]["scope"]["channels"] == ["physical"]
 
 
-    assert first.visualizations[0].title == (
-        "Sålda enheter och nettoomsättning – 2026"
-    )
+    assert first.visualizations[0].title == "Utveckling – 2026"
     assert second.visualizations[0].title == (
-        "Sålda enheter och nettoomsättning – Online – 2026"
+        "Utveckling – Online – 2026"
     )
     assert third.visualizations[0].title == (
-        "Sålda enheter och nettoomsättning – Fysiska butiker – 2026"
+        "Utveckling – Fysiska butiker – 2026"
     )
+
+    assert first.message
+    assert second.message
+    assert third.message
 
 
 async def test_product_q1_misclassification_is_corrected_and_graph_reuses_overview():
@@ -228,3 +230,145 @@ async def test_product_q1_misclassification_is_corrected_and_graph_reuses_overvi
     assert second.visualizations[0].type == "line_chart"
     assert "Windbreaker Jacket" in second.visualizations[0].title
 
+
+
+
+def _stockholm_rank_result() -> dict:
+    names = [
+        ("AURA-ACT-006", "Sports Bra", 641, 243374.59),
+        ("AURA-JKT-025", "Windbreaker Jacket", 610, 220000.00),
+        ("AURA-JKT-023", "Oversized Blazer", 590, 210000.00),
+        ("AURA-ACT-002", "Running Tee", 560, 190000.00),
+        ("AURA-ACT-004", "Compression Tights", 525, 180000.00),
+    ]
+    rows = []
+    for rank, (product_id, name, units, net_sales) in enumerate(
+        names,
+        start=1,
+    ):
+        rows.append(
+            {
+                "rank": rank,
+                "entity": {
+                    "type": "product",
+                    "id": product_id,
+                    "name": name,
+                },
+                "metrics": {
+                    "units": units,
+                    "net_sales": net_sales,
+                    "gross_sales": net_sales * 1.04,
+                    "discounts": 1000.0,
+                    "orders": max(1, units - 80),
+                    "average_selling_price": net_sales / units,
+                    "discount_rate": 0.04,
+                },
+                "share_of_rank_metric": 0.05,
+                "previous_rank_metric_value": None,
+                "rank_metric_absolute_change": None,
+                "rank_metric_percent_change": None,
+            }
+        )
+
+    return {
+        "status": "success",
+        "group_by": "product",
+        "rank_by": "units",
+        "order": "highest",
+        "effective_period": {
+            "start": "2024-01-01",
+            "end": "2026-06-30",
+            "label": "All available data",
+            "defaulted": True,
+        },
+        "effective_scope": {
+            "channels": [],
+            "cities": ["Stockholm"],
+            "store_ids": [],
+            "categories": [],
+            "product_ids": [],
+        },
+        "warnings": [
+            "No period supplied; using the full available date range."
+        ],
+        "total_population_rank_metric_value": 9870.0,
+        "returned_rows_rank_metric_value": sum(
+            row["metrics"]["units"] for row in rows
+        ),
+        "comparison_period": None,
+        "rows": rows,
+    }
+
+
+async def test_technical_case_plural_ranking_defaults_to_five_and_show_more_to_ten():
+    def decide(_message: str, turn: int):
+        if turn == 1:
+            return {
+                # Reproduce the live behavior we are correcting: the model
+                # chooses one result despite plural wording.
+                "mode": "new_analysis",
+                "operation": "ranking",
+                "metrics": ["units"],
+                "group_by": "product",
+                "rank_by": "units",
+                "rank_order": "highest",
+                "limit": 1,
+                "scope": {"cities": ["Stockholm"]},
+            }
+
+        # Reproduce another plausible model miss: "visa fler" gets labelled
+        # conversational. Deterministic continuation semantics must override it.
+        return {
+            "mode": "conversation",
+            "limit": 1,
+        }
+
+    mcp = FakeMcpClient(
+        call_results={
+            "sales_rank": mcp_result(
+                _stockholm_rank_result()
+            )
+        }
+    )
+    service = build_agent_service(
+        mcp,
+        interpreter=make_interpreter_node(decide=decide),
+    )
+
+    first = await _ask(
+        service,
+        "Vilka produkter säljer bäst i Stockholm?",
+        "conv-stockholm-ranking",
+    )
+    second = await _ask(
+        service,
+        "Kan du visa fler?",
+        "conv-stockholm-ranking",
+    )
+
+    rank_calls = [
+        arguments
+        for name, arguments in mcp.calls
+        if name == "sales_rank"
+    ]
+
+    assert len(rank_calls) == 2
+    assert rank_calls[0]["limit"] == 5
+    assert rank_calls[1]["limit"] == 10
+
+    for arguments in rank_calls:
+        assert arguments["group_by"] == "product"
+        assert arguments["rank_by"] == "units"
+        assert arguments["order"] == "highest"
+        assert arguments["scope"]["cities"] == ["Stockholm"]
+
+    assert first.visualizations[0].type == "bar_chart"
+    assert second.visualizations[0].type == "bar_chart"
+
+    assert first.message.startswith(
+        "Sports Bra säljer bäst i Stockholm med 641 sålda enheter"
+    )
+    assert "Diagrammet visar de 5" in first.message
+    assert second.message.startswith(
+        "Sports Bra säljer bäst i Stockholm med 641 sålda enheter"
+    )

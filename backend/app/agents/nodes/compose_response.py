@@ -9,6 +9,8 @@ from typing import Any
 from google.adk.agents.context import Context
 from google.adk.workflow import BaseNode, node
 
+from app.agents.answer_builder import build_short_answer
+from app.agents.request_state import coerce_request
 from app.agents.state import ExecutedToolCall, StateKeys
 from app.schemas.agent import (
     AgentQueryResponse,
@@ -72,6 +74,8 @@ def build_compose_response_node() -> BaseNode:
         visualization_datasets_json: Any = "[]",
         analysis: str | None = None,
         direct_message: str | None = None,
+        canonical_request_json: Any = "null",
+        effective_mode: str = "",
         conversation_id: str = "",
         ui_language: str = "en",
     ) -> None:
@@ -98,10 +102,32 @@ def build_compose_response_node() -> BaseNode:
             if spec.dataset in valid_dataset_ids
         ]
 
+        request = coerce_request(
+            canonical_request_json
+        )
+
         message = (
             (direct_message or "").strip()
             or (analysis or "").strip()
         )
+
+        if (
+            not message
+            and request is not None
+        ):
+            message = build_short_answer(
+                request,
+                results,
+                ui_language,
+                effective_mode=effective_mode,
+            ).strip()
+
+        if not message and specs:
+            message = (
+                "Här är resultatet."
+                if ui_language == "sv"
+                else "Here is the result."
+            )
 
         if not message and not specs:
             message = (

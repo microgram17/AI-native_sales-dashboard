@@ -145,6 +145,27 @@ _MODIFIER_PATTERNS = (
     r"\bsamma men\b",
 )
 
+
+_RANK_MORE_PATTERNS = (
+    r"^show\s+more\b",
+    r"^show\s+me\s+more\b",
+    r"^can\s+you\s+show\s+(?:me\s+)?more\b",
+    r"^more\s+(?:results?|products?|items?)\b",
+    r"^visa\s+fler\b",
+    r"^kan\s+du\s+visa\s+fler\b",
+    r"^fler\s+(?:resultat|produkter|poster)\b",
+)
+
+_RANK_FEWER_PATTERNS = (
+    r"^show\s+fewer\b",
+    r"^show\s+me\s+fewer\b",
+    r"^can\s+you\s+show\s+(?:me\s+)?fewer\b",
+    r"^fewer\s+(?:results?|products?|items?)\b",
+    r"^visa\s+färre\b",
+    r"^kan\s+du\s+visa\s+färre\b",
+    r"^färre\s+(?:resultat|produkter|poster)\b",
+)
+
 _NUMBER_WORDS = {
     "one": 1,
     "two": 2,
@@ -322,7 +343,16 @@ def _infer_metrics(text: str) -> list[Metric]:
 
 
 def _infer_rank_limit(text: str) -> int | None:
+    """Infer an explicit/default ranking size from the raw wording.
+
+    Singular winner questions default to one result. Plural ranking questions
+    default to five results. This distinction is important for wording such as
+    "Vilka produkter säljer bäst?" where "bäst" describes a ranking, not a
+    request for exactly one winner.
+    """
+
     lowered = text.casefold()
+
     match = re.search(
         r"\b(?:top|bottom|topp|botten)\s+"
         r"(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|"
@@ -335,13 +365,56 @@ def _infer_rank_limit(text: str) -> int | None:
         if value is not None:
             return max(1, min(value, 20))
 
-    if re.search(
+    ranking_word = re.search(
         r"\b(?:best|worst|highest|lowest|bäst|sämst|högst|lägst)\b",
         lowered,
-    ):
-        return 1
+    )
+    if not ranking_word:
+        return None
 
+    plural_group = re.search(
+        r"\b(?:"
+        r"which\s+(?:products?|categories|stores|cities|channels)|"
+        r"what\s+(?:products?|categories|stores|cities|channels)|"
+        r"products?|categories|stores|cities|channels|"
+        r"vilka\s+(?:produkter|kategorier|butiker|städer|kanaler)|"
+        r"produkter|kategorier|butiker|städer|kanaler"
+        r")\b",
+        lowered,
+    )
+    if plural_group:
+        return 5
+
+    return 1
+
+
+def _rank_limit_followup_direction(text: str) -> str | None:
+    lowered = text.casefold().strip()
+    if _matches_any(lowered, _RANK_MORE_PATTERNS):
+        return "more"
+    if _matches_any(lowered, _RANK_FEWER_PATTERNS):
+        return "fewer"
     return None
+
+
+def _rank_followup_limit(
+    current_limit: int,
+    text: str,
+) -> int | None:
+    direction = _rank_limit_followup_direction(text)
+    if direction is None:
+        return None
+
+    current = max(1, min(int(current_limit), 20))
+
+    if direction == "more":
+        if current < 5:
+            return 5
+        return min(20, current + 5)
+
+    if current <= 5:
+        return 1
+    return max(5, current - 5)
 
 
 def _infer_rank_order(text: str) -> str | None:
@@ -538,6 +611,12 @@ def effective_mode(
     channels = _infer_channels(lowered)
     period = _infer_period(lowered, current_date)
     metrics = _infer_metrics(lowered)
+
+    if (
+        previous.operation == "ranking"
+        and _rank_limit_followup_direction(lowered) is not None
+    ):
+        return "modify_analysis"
 
     if has_prior_results and _is_presentation_only(
         lowered,
@@ -852,6 +931,10 @@ def merge_request(
         )
         values["limit"] = (
             _infer_rank_limit(text)
+            or _rank_followup_limit(
+                int(values.get("limit") or 10),
+                text,
+            )
             or interpretation.limit
             or values.get("limit")
             or 10

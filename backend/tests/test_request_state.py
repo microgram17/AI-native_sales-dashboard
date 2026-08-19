@@ -195,3 +195,109 @@ def test_modifier_ignores_hallucinated_operation_and_grain():
     assert updated.period_start == date(2026, 1, 1)
     assert updated.period_end == date(2026, 12, 31)
     assert updated.scope.channels == ["online"]
+
+
+
+def test_plural_best_products_defaults_to_five_even_if_llm_says_one():
+    request = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="ranking",
+            group_by="product",
+            rank_by="units",
+            rank_order="highest",
+            limit=1,
+            scope={"cities": ["Stockholm"]},
+        ),
+        user_message="Vilka produkter säljer bäst i Stockholm?",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert request.operation == "ranking"
+    assert request.group_by == "product"
+    assert request.rank_by == "units"
+    assert request.rank_order == "highest"
+    assert request.limit == 5
+    assert request.scope.cities == ["Stockholm"]
+
+
+def test_singular_best_product_defaults_to_one():
+    request = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="ranking",
+            group_by="product",
+            rank_by="units",
+            rank_order="highest",
+            limit=5,
+        ),
+        user_message="Vilken produkt säljer bäst?",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert request.limit == 1
+
+
+def test_show_more_ranking_followup_forces_modify_and_increases_limit():
+    previous = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="ranking",
+            group_by="product",
+            rank_by="units",
+            rank_order="highest",
+            limit=1,
+            scope={"cities": ["Stockholm"]},
+        ),
+        user_message="Vilka produkter säljer bäst i Stockholm?",
+        current_date=date(2026, 8, 18),
+    )
+
+    mode = effective_mode(
+        TurnInterpretation(mode="conversation"),
+        previous=previous,
+        has_prior_results=True,
+        user_message="Kan du visa fler?",
+        current_date=date(2026, 8, 18),
+    )
+    assert mode == "modify_analysis"
+
+    updated = merge_request(
+        previous,
+        TurnInterpretation(
+            mode="conversation",
+            limit=1,
+        ),
+        user_message="Kan du visa fler?",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert updated.operation == "ranking"
+    assert updated.limit == 10
+    assert updated.group_by == "product"
+    assert updated.rank_by == "units"
+    assert updated.scope.cities == ["Stockholm"]
+
+
+def test_show_fewer_ranking_followup_decreases_limit():
+    previous = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="ranking",
+            group_by="product",
+            rank_by="units",
+            rank_order="highest",
+            limit=10,
+        ),
+        user_message="Visa topp 10 produkter.",
+        current_date=date(2026, 8, 18),
+    )
+
+    updated = merge_request(
+        previous,
+        TurnInterpretation(mode="modify_analysis"),
+        user_message="Visa färre.",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert updated.limit == 5
