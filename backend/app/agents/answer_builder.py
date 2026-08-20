@@ -512,6 +512,35 @@ def _visualization_reuse_answer(
             else "Here is the ranking as a chart."
         )
 
+    if (
+        request.operation == "summary"
+        and isinstance(result.get("previous"), dict)
+    ):
+        current = result.get("current")
+        metric = (
+            "net_sales"
+            if isinstance(current, dict)
+            and current.get("net_sales") is not None
+            else (
+                request.metrics[0]
+                if request.metrics
+                else "net_sales"
+            )
+        )
+        metric_label = _METRIC_LABELS[lang].get(
+            metric,
+            metric.replace("_", " "),
+        )
+        if lang == "sv":
+            return (
+                f"Här är {metric_label}{scope}{period} "
+                "jämfört med föregående period."
+            )
+        return (
+            f"Here is {metric_label}{scope}{period} "
+            "compared with the previous period."
+        )
+
     return (
         "Här är resultatet som diagram."
         if lang == "sv"

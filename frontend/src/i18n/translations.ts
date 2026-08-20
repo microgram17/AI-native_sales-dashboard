@@ -27,6 +27,7 @@ export interface Translations {
   discounts: string
   // Section headings
   productRevenueTrend: string
+  productTrendTitle: (metricLabel: string) => string
   topProducts: string
   storeBreakdown: string
   chat: string
@@ -52,6 +53,7 @@ export interface Translations {
   productsSelected: (n: number) => string
   productsTop5: string
   clearSelection: string
+  productsNoneSelected: string
   noTimeseriesData: string
   // StoreBreakdownChart
   noStoreData: string
@@ -75,6 +77,7 @@ export interface Translations {
   exportFilter: string
   exportValue: string
   salesSummary: string
+  vsPreviousPeriod: string
   exportTopProducts: string
   exportSortedBy: string
 }
@@ -103,6 +106,7 @@ export const translations: Record<Language, Translations> = {
     units: 'Units',
     discounts: 'Discounts',
     productRevenueTrend: 'Product Revenue Trend',
+    productTrendTitle: (metricLabel) => `${metricLabel} by product`,
     topProducts: 'Top Products',
     storeBreakdown: 'Store Breakdown',
     chat: 'Chat',
@@ -124,6 +128,7 @@ export const translations: Record<Language, Translations> = {
     productsSelected: (n) => `Products (${n} selected)`,
     productsTop5: 'Products (top 5)',
     clearSelection: 'Clear',
+    productsNoneSelected: 'Products (none selected)',
     noTimeseriesData: 'No timeseries data available.',
     noStoreData: 'No store breakdown data available.',
     vizNoMetrics: 'No metrics available to display.',
@@ -144,6 +149,7 @@ export const translations: Record<Language, Translations> = {
     exportFilter: 'Filter',
     exportValue: 'Value',
     salesSummary: 'Sales Summary',
+    vsPreviousPeriod: 'vs previous period',
     exportTopProducts: 'Top 5 products',
     exportSortedBy: 'Sorted by',
   },
@@ -170,6 +176,7 @@ export const translations: Record<Language, Translations> = {
     units: 'Enheter',
     discounts: 'Rabatter',
     productRevenueTrend: 'Produktomsättningstrend',
+    productTrendTitle: (metricLabel) => `${metricLabel} per produkt`,
     topProducts: 'Topprodukter',
     storeBreakdown: 'Butiksfördelning',
     chat: 'Chatt',
@@ -191,6 +198,7 @@ export const translations: Record<Language, Translations> = {
     productsSelected: (n) => `Produkter (${n} valda)`,
     productsTop5: 'Produkter (topp 5)',
     clearSelection: 'Rensa',
+    productsNoneSelected: 'Produkter (inga valda)',
     noTimeseriesData: 'Ingen tidsseriedata tillgänglig.',
     noStoreData: 'Ingen butiksdata tillgänglig.',
     vizNoMetrics: 'Inga mätvärden att visa.',
@@ -211,6 +219,7 @@ export const translations: Record<Language, Translations> = {
     exportFilter: 'Filter',
     exportValue: 'Värde',
     salesSummary: 'Försäljningsöversikt',
+    vsPreviousPeriod: 'mot föregående period',
     exportTopProducts: 'Topp 5 produkter',
     exportSortedBy: 'Sorterat efter',
   },

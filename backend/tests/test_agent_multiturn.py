@@ -372,3 +372,143 @@ async def test_technical_case_plural_ranking_defaults_to_five_and_show_more_to_t
     assert second.message.startswith(
         "Sports Bra säljer bäst i Stockholm med 641 sålda enheter"
     )
+async def test_summary_then_explicit_line_graph_fetches_monthly_trend():
+    summary_result = {
+        "status": "success",
+        "effective_period": {
+            "start": "2026-01-01",
+            "end": "2026-03-31",
+            "label": "2026-01-01 – 2026-03-31",
+            "defaulted": False,
+        },
+        "effective_scope": {
+            "channels": [],
+            "cities": [],
+            "store_ids": [],
+            "categories": [],
+            "product_ids": [],
+        },
+        "warnings": [],
+        "current": {
+            "units": 3007,
+            "net_sales": 1636186.14,
+            "gross_sales": 1710721.33,
+            "discounts": 74535.19,
+            "orders": 2267,
+            "average_selling_price": 544.13,
+            "discount_rate": 0.0436,
+        },
+        "previous": {
+            "units": 2989,
+            "net_sales": 1736107.69,
+            "gross_sales": 1843995.01,
+            "discounts": 107887.32,
+            "orders": 2261,
+            "average_selling_price": 580.83,
+            "discount_rate": 0.0585,
+        },
+    }
+    trend_result = {
+        "status": "success",
+        "grain": "month",
+        "split_by": None,
+        "effective_period": {
+            "start": "2026-01-01",
+            "end": "2026-03-31",
+            "label": "2026-01-01 – 2026-03-31",
+            "defaulted": False,
+        },
+        "effective_scope": {
+            "channels": [],
+            "cities": [],
+            "store_ids": [],
+            "categories": [],
+            "product_ids": [],
+        },
+        "warnings": [],
+        "rows": [
+            {
+                "period_start": "2026-01-01",
+                "period_label": "2026-01",
+                "series_entity": None,
+                "metrics": {
+                    "net_sales": 577975.25,
+                },
+            },
+            {
+                "period_start": "2026-02-01",
+                "period_label": "2026-02",
+                "series_entity": None,
+                "metrics": {
+                    "net_sales": 534170.10,
+                },
+            },
+            {
+                "period_start": "2026-03-01",
+                "period_label": "2026-03",
+                "series_entity": None,
+                "metrics": {
+                    "net_sales": 524040.79,
+                },
+            },
+        ],
+    }
+
+    def decide(_message: str, turn: int):
+        if turn == 1:
+            return {
+                "mode": "new_analysis",
+                "operation": "summary",
+                "metrics": [
+                    "units",
+                    "net_sales",
+                    "orders",
+                    "average_selling_price",
+                ],
+                "period_start": "2026-01-01",
+                "period_end": "2026-03-31",
+            }
+        return {
+            # Reproduce the live miss: the model thinks this can reuse the
+            # snapshot even though the user explicitly asks for a line graph.
+            "mode": "visualize_existing",
+            "presentation": "chart",
+        }
+
+    mcp = FakeMcpClient(
+        call_results={
+            "sales_summary": mcp_result(summary_result),
+            "sales_trend": mcp_result(trend_result),
+        }
+    )
+    service = build_agent_service(
+        mcp,
+        interpreter=make_interpreter_node(decide=decide),
+    )
+
+    await _ask(
+        service,
+        "Hur har det gått för oss under q1?",
+        "conv-line-graph",
+    )
+    response = await _ask(
+        service,
+        "visa en linjegraf",
+        "conv-line-graph",
+    )
+
+    assert [name for name, _ in mcp.calls] == [
+        "sales_summary",
+        "sales_trend",
+    ]
+    trend_args = mcp.calls[-1][1]
+    assert trend_args["grain"] == "month"
+    assert trend_args["period_start"] == "2026-01-01"
+    assert trend_args["period_end"] == "2026-03-31"
+
+    assert response.visualizations[0].type == "line_chart"
+    assert response.visualizations[0].y_keys == ["net_sales"]
+    assert response.message == (
+        "Här är den månatliga utvecklingen för "
+        "nettoomsättning under Q1 2026."
+    )

@@ -45,8 +45,17 @@ _GRAPH_PATTERNS = (
     r"\bgraph\b",
     r"\bchart\b",
     r"\bplot\b",
+    r"\bline\s+(?:chart|graph|plot)\b",
+    r"\blinjegraf(?:en|er)?\b",
+    r"\blinjediagram(?:met|men)?\b",
     r"\bgraf(?:a|en|er|iskt)?\b",
     r"\bdiagram\b",
+)
+
+_LINE_CHART_PATTERNS = (
+    r"\bline\s+(?:chart|graph|plot)\b",
+    r"\blinjegraf(?:en|er)?\b",
+    r"\blinjediagram(?:met|men)?\b",
 )
 
 _TABLE_PATTERNS = (
@@ -459,11 +468,19 @@ def _infer_rank_by(text: str) -> str | None:
     return None
 
 
+def _has_explicit_line_chart_intent(text: str) -> bool:
+    return _matches_any(
+        text.casefold(),
+        _LINE_CHART_PATTERNS,
+    )
+
+
 def _has_explicit_trend_intent(text: str) -> bool:
     lowered = text.casefold()
     return (
         _infer_grain(lowered) is not None
         or _matches_any(lowered, _TREND_PATTERNS)
+        or _has_explicit_line_chart_intent(lowered)
     )
 
 
@@ -617,6 +634,21 @@ def effective_mode(
         and _rank_limit_followup_direction(lowered) is not None
     ):
         return "modify_analysis"
+
+    if (
+        has_prior_results
+        and _has_explicit_line_chart_intent(lowered)
+    ):
+        # A line chart needs an X-axis progression. Reuse an existing trend
+        # (or the rich monthly trend inside product_overview), but a summary
+        # snapshot/comparison must be re-queried as a trend.
+        if previous.operation in {
+            "trend",
+            "product_overview",
+        }:
+            return "visualize_existing"
+        if previous.operation == "summary":
+            return "modify_analysis"
 
     if has_prior_results and _is_presentation_only(
         lowered,
@@ -888,6 +920,9 @@ def merge_request(
     )
 
     original_operation = previous.operation
+    explicit_line_chart = (
+        _has_explicit_line_chart_intent(text)
+    )
 
     # A modify turn is a patch, not a replacement plan. The operation changes
     # only when the raw wording contains a high-confidence operation cue.
@@ -895,6 +930,24 @@ def merge_request(
     # turn "what about Q1?" into a quarterly trend.
     if explicit_operation is not None:
         values["operation"] = explicit_operation
+
+    if (
+        explicit_line_chart
+        and original_operation == "summary"
+    ):
+        values["operation"] = "trend"
+        values["grain"] = None
+
+        # Summary requests often carry the full default KPI set. A line chart
+        # over all of them is noisy and does not match the comparison chart the
+        # user just saw. Preserve a genuinely single-metric summary; otherwise
+        # use net sales as the deterministic default.
+        if not inferred_metrics:
+            values["metrics"] = (
+                list(previous.metrics)
+                if len(previous.metrics) == 1
+                else ["net_sales"]
+            )
 
     if inferred_metrics:
         values["metrics"] = inferred_metrics

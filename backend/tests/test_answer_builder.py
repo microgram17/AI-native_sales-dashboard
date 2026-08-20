@@ -207,3 +207,43 @@ def test_visualization_reuse_does_not_repeat_previous_kpis():
         "Här är utvecklingen för Windbreaker Jacket under Q1 2026."
     )
     assert "144" not in answer
+def test_summary_visualization_reuse_names_the_comparison_metric():
+    request = AnalysisRequestState(
+        operation="summary",
+        metrics=[
+            "units",
+            "net_sales",
+            "orders",
+            "average_selling_price",
+        ],
+        period_start=date(2026, 1, 1),
+        period_end=date(2026, 3, 31),
+    )
+    result = {
+        "status": "success",
+        "effective_period": {
+            "start": "2026-01-01",
+            "end": "2026-03-31",
+            "defaulted": False,
+        },
+        "current": {
+            "units": 3007,
+            "net_sales": 1636186.14,
+        },
+        "previous": {
+            "units": 2989,
+            "net_sales": 1736107.69,
+        },
+    }
+
+    answer = build_short_answer(
+        request,
+        _executed("sales_summary", result),
+        "sv",
+        effective_mode="visualize_existing",
+    )
+
+    assert answer == (
+        "Här är nettoomsättning under Q1 2026 "
+        "jämfört med föregående period."
+    )

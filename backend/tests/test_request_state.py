@@ -301,3 +301,74 @@ def test_show_fewer_ranking_followup_decreases_limit():
     )
 
     assert updated.limit == 5
+def test_explicit_line_graph_after_summary_requires_new_monthly_trend():
+    previous = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="summary",
+            metrics=[
+                "units",
+                "net_sales",
+                "orders",
+                "average_selling_price",
+            ],
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 3, 31),
+        ),
+        user_message="Hur har det gått för oss under q1?",
+        current_date=date(2026, 8, 18),
+    )
+
+    mode = effective_mode(
+        TurnInterpretation(
+            mode="visualize_existing",
+            presentation="chart",
+        ),
+        previous=previous,
+        has_prior_results=True,
+        user_message="visa en linjegraf",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert mode == "modify_analysis"
+
+    updated = merge_request(
+        previous,
+        TurnInterpretation(
+            mode="visualize_existing",
+            presentation="chart",
+        ),
+        user_message="visa en linjegraf",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert updated.operation == "trend"
+    assert updated.grain == "month"
+    assert updated.metrics == ["net_sales"]
+    assert updated.presentation == "chart"
+    assert updated.period_start == date(2026, 1, 1)
+    assert updated.period_end == date(2026, 3, 31)
+
+
+def test_line_graph_reuses_existing_product_overview_trend():
+    previous = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="product_overview",
+            product_query="windbreaker",
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 3, 31),
+        ),
+        user_message="Hur har det gått under q1 för vår windbreaker?",
+        current_date=date(2026, 8, 18),
+    )
+
+    mode = effective_mode(
+        TurnInterpretation(mode="modify_analysis"),
+        previous=previous,
+        has_prior_results=True,
+        user_message="visa en linjegraf",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert mode == "visualize_existing"
