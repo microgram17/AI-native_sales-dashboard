@@ -4,12 +4,32 @@ import {
   useState,
 } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import type { ChatEntry } from '../../types/agent'
+import type {
+  ChatEntry,
+  DashboardChatContext,
+  WidgetAnalysisRequest,
+} from '../../types/agent'
 import { queryAgent } from '../../api/agent'
 import { ChatMessage } from './ChatMessage'
 import { useTranslation } from '../../i18n/LanguageContext'
 
-export function ChatPanel() {
+export interface ChatPromptRequest {
+  id: number
+  text: string
+  widgetAnalysis: WidgetAnalysisRequest
+}
+
+interface ChatPanelProps {
+  dashboardContext?: DashboardChatContext
+  contextLabel?: string
+  requestedPrompt?: ChatPromptRequest | null
+}
+
+export function ChatPanel({
+  dashboardContext,
+  contextLabel,
+  requestedPrompt,
+}: ChatPanelProps = {}) {
   const { t, language } = useTranslation()
   const [messages, setMessages] =
     useState<ChatEntry[]>([])
@@ -19,6 +39,7 @@ export function ChatPanel() {
     setConversationId,
   ] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const lastRequestedPromptId = useRef<number | null>(null)
 
   const mutation = useMutation({
     mutationFn: queryAgent,
@@ -47,6 +68,41 @@ export function ChatPanel() {
     })
   }, [messages])
 
+  useEffect(() => {
+    if (
+      !requestedPrompt?.text ||
+      mutation.isPending ||
+      lastRequestedPromptId.current === requestedPrompt.id
+    ) {
+      return
+    }
+
+    lastRequestedPromptId.current = requestedPrompt.id
+    const text = requestedPrompt.text.trim()
+    setInput('')
+    setConversationId(null)
+    setMessages([
+      {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: text,
+      },
+    ])
+    mutation.reset()
+    mutation.mutate({
+      message: text,
+      conversation_id: null,
+      language,
+      dashboard_context: dashboardContext,
+      widget_analysis: requestedPrompt.widgetAnalysis,
+    })
+  }, [
+    dashboardContext,
+    language,
+    mutation,
+    requestedPrompt,
+  ])
+
   function handleSubmit(
     event: React.FormEvent,
   ) {
@@ -69,6 +125,7 @@ export function ChatPanel() {
       message: text,
       conversation_id: conversationId,
       language,
+      dashboard_context: dashboardContext,
     })
   }
 
@@ -83,6 +140,9 @@ export function ChatPanel() {
   return (
     <div className="dashboard-chat">
       <div className="dashboard-chat-toolbar">
+        {contextLabel && (
+          <span className="dashboard-chat-context">{contextLabel}</span>
+        )}
         <button
           type="button"
           onClick={handleNewConversation}
@@ -98,7 +158,18 @@ export function ChatPanel() {
       <div className="dashboard-chat-messages">
         {messages.length === 0 && (
           <div className="dashboard-chat-empty">
-            {t.chatEmpty}
+            <p>{t.chatEmpty}</p>
+            <div className="dashboard-chat-suggestions">
+              {t.chatSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setInput(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

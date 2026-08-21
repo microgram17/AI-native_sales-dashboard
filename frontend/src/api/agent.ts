@@ -10,6 +10,8 @@ export function queryAgent(request: AgentQueryRequest): Promise<AgentQueryRespon
       message: request.message,
       conversation_id: request.conversation_id ?? null,
       language: request.language,
+      dashboard_context: request.dashboard_context,
+      widget_analysis: request.widget_analysis,
     }),
   })
 }

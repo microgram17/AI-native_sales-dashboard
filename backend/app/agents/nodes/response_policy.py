@@ -9,10 +9,12 @@ from typing import Any
 from google.adk.agents.context import Context
 from google.adk.workflow import BaseNode, node
 
+from app.agents.analysis_facts import derive_analysis_facts
 from app.agents.request_state import coerce_request
 from app.agents.state import (
     ROUTE_DO_ANALYTICS,
     ROUTE_SKIP_ANALYTICS,
+    StateKeys,
 )
 from app.schemas.visualization import VisualizationPlan
 
@@ -110,6 +112,12 @@ def build_response_policy_node() -> BaseNode:
         visualization_plan: Any = None,
         direct_message: str | None = None,
     ) -> None:
+        request = coerce_request(canonical_request_json)
+        facts = derive_analysis_facts(request, business_results_json)
+        ctx.state[StateKeys.ANALYSIS_FACTS_JSON] = json.dumps(
+            facts,
+            ensure_ascii=False,
+        )
         ctx.route = (
             ROUTE_DO_ANALYTICS
             if should_run_analytics(

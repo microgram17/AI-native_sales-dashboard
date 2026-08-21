@@ -63,3 +63,89 @@ def test_supplier_id_is_not_accepted_from_request_body():
     assert fake.seen_context.supplier_id == "NORDVALE"
     assert not hasattr(fake.seen_request, "supplier_id")
     assert response.json()["message"] == "supplier=NORDVALE"
+
+
+def test_dashboard_context_is_accepted_without_affecting_supplier_scope():
+    fake = CapturingAgentService()
+    app.dependency_overrides[get_request_context] = lambda: RequestContext(
+        user_id="DEV-USER-001", supplier_id="NORDVALE", roles=["admin"]
+    )
+    app.dependency_overrides[get_agent_service] = lambda: fake
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/query",
+        json={
+            "message": "What stands out?",
+            "dashboard_context": {
+                "date_from": "2026-01-01",
+                "date_to": "2026-06-30",
+                "metric": "net_sales",
+                "group_by": "store",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake.seen_request.dashboard_context.date_from.isoformat() == "2026-01-01"
+    assert fake.seen_context.supplier_id == "NORDVALE"
+
+
+def test_widget_analysis_is_validated_as_a_scoped_new_request():
+    fake = CapturingAgentService()
+    app.dependency_overrides[get_request_context] = lambda: RequestContext(
+        user_id="DEV-USER-001", supplier_id="NORDVALE", roles=["admin"]
+    )
+    app.dependency_overrides[get_agent_service] = lambda: fake
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/query",
+        json={
+            "message": "Analyze this sales trend.",
+            "widget_analysis": {
+                "widget": "sales_trend",
+                "operation": "trend",
+                "metrics": ["net_sales"],
+                "period_start": "2026-01-01",
+                "period_end": "2026-06-30",
+                "grain": "month",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    widget = fake.seen_request.widget_analysis
+    assert widget.widget == "sales_trend"
+    assert widget.operation == "trend"
+    assert widget.metrics == ["net_sales"]
+    assert fake.seen_context.supplier_id == "NORDVALE"
+
+
+def test_performance_trend_requires_selected_widget_series():
+    fake = CapturingAgentService()
+    app.dependency_overrides[get_request_context] = lambda: RequestContext(
+        user_id="DEV-USER-001", supplier_id="NORDVALE", roles=["admin"]
+    )
+    app.dependency_overrides[get_agent_service] = lambda: fake
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/query",
+        json={
+            "message": "Analyze this performance trend.",
+            "widget_analysis": {
+                "widget": "performance",
+                "operation": "trend",
+                "metrics": ["net_sales"],
+                "period_start": "2025-07-01",
+                "period_end": "2026-06-30",
+                "grain": "month",
+                "split_by": "store",
+                "series_limit": 3,
+                "scope": {},
+            },
+        },
+    )
+
+    assert response.status_code == 422

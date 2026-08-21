@@ -5,7 +5,9 @@ import { ChatPanel } from './ChatPanel'
 import { LanguageProvider } from '../../i18n/LanguageContext'
 import type { AgentQueryResponse } from '../../types/agent'
 
-function renderChat() {
+function renderChat(
+  props?: React.ComponentProps<typeof ChatPanel>,
+) {
   const client = new QueryClient({
     defaultOptions: {
       mutations: { retry: false },
@@ -15,7 +17,7 @@ function renderChat() {
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider>
-        <ChatPanel />
+        <ChatPanel {...props} />
       </LanguageProvider>
     </QueryClientProvider>,
   )
@@ -58,6 +60,35 @@ afterEach(() => {
 })
 
 describe('ChatPanel', () => {
+  it('renders assistant Markdown without enabling raw HTML', async () => {
+    fetchMock.mockResolvedValue(okResponse({
+      ...baseResponse,
+      message: [
+        '**Important result**',
+        '',
+        '- First observation',
+        '- Second observation',
+        '',
+        '[Details](https://example.com)',
+        '![Generated chart](data:image/png;base64,unsafe)',
+        '<script>unsafe()</script>',
+      ].join('\n'),
+    }))
+
+    renderChat()
+    submit('analyze')
+
+    const strong = await screen.findByText('Important result')
+    expect(strong.tagName).toBe('STRONG')
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    const link = screen.getByRole('link', { name: 'Details' })
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer noopener')
+    expect(document.querySelector('script')).toBeNull()
+    expect(document.querySelector('img')).toBeNull()
+    expect(screen.queryByText('unsafe()')).not.toBeInTheDocument()
+  })
+
   it('submits to POST /agent/query without supplier and with null conversation_id first', async () => {
     renderChat()
     submit('best product?')
@@ -84,6 +115,71 @@ describe('ChatPanel', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body)
     expect(secondBody.conversation_id).toBe('conv-1')
+  })
+
+  it('sends the active dashboard context with a question', async () => {
+    renderChat({
+      dashboardContext: {
+        date_from: '2026-01-01',
+        date_to: '2026-06-30',
+        metric: 'net_sales',
+        group_by: 'store',
+      },
+    })
+    submit('what stands out?')
+
+    await screen.findByText('Winner is Hoodie.')
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.dashboard_context).toEqual({
+      date_from: '2026-01-01',
+      date_to: '2026-06-30',
+      metric: 'net_sales',
+      group_by: 'store',
+    })
+  })
+
+  it('uses a suggested question to populate the composer', () => {
+    renderChat()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /förändrades försäljningen/i,
+      }),
+    )
+
+    expect(screen.getByRole('textbox')).toHaveValue(
+      'Varför förändrades försäljningen under perioden?',
+    )
+  })
+
+  it('starts and submits a fresh widget-scoped analysis automatically', async () => {
+    renderChat({
+      requestedPrompt: {
+        id: 1,
+        text: 'Analyze this trend.',
+        widgetAnalysis: {
+          widget: 'sales_trend',
+          operation: 'trend',
+          metrics: ['net_sales'],
+          period_start: '2026-01-01',
+          period_end: '2026-06-30',
+          grain: 'month',
+        },
+      },
+    })
+
+    await screen.findByText('Winner is Hoodie.')
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.conversation_id).toBeNull()
+    expect(body.widget_analysis).toEqual({
+      widget: 'sales_trend',
+      operation: 'trend',
+      metrics: ['net_sales'],
+      period_start: '2026-01-01',
+      period_end: '2026-06-30',
+      grain: 'month',
+    })
+    expect(screen.getByText('Analyze this trend.')).toBeInTheDocument()
   })
 
   it('New conversation clears conversation_id', async () => {

@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import date
 
 from app.agents.request_state import (
+    apply_dashboard_context,
     build_new_request,
     effective_mode,
     merge_request,
 )
-from app.schemas.agent import TurnInterpretation
+from app.schemas.agent import DashboardContext, TurnInterpretation
 
 
 def _trend_request():
@@ -23,6 +24,124 @@ def _trend_request():
         user_message="Visa sålda enheter och nettoomsättning månadsvis för 2026.",
         current_date=date(2026, 8, 18),
     )
+
+
+def test_current_dashboard_trend_applies_exact_visible_store_series():
+    request = build_new_request(
+        TurnInterpretation(mode="new_analysis", operation="summary"),
+        user_message="Analyze the current dashboard view.",
+        current_date=date(2026, 8, 18),
+    )
+
+    contextualized = apply_dashboard_context(
+        request,
+        DashboardContext(
+            date_from=date(2025, 7, 1),
+            date_to=date(2026, 6, 30),
+            metric="net_sales",
+            grain="month",
+            group_by="store",
+            view="trend",
+            selected_group_ids=["ONLINE-SE", "STO-001", "STO-002"],
+        ),
+        user_message="Analyze the current dashboard view.",
+    )
+
+    assert contextualized.operation == "trend"
+    assert contextualized.metrics == ["net_sales"]
+    assert contextualized.grain == "month"
+    assert contextualized.split_by == "store"
+    assert contextualized.scope.store_ids == [
+        "ONLINE-SE",
+        "STO-001",
+        "STO-002",
+    ]
+    assert contextualized.series_limit == 3
+    assert contextualized.period_start == date(2025, 7, 1)
+    assert contextualized.period_end == date(2026, 6, 30)
+
+
+def test_explicit_city_group_never_inherits_store_ids():
+    request = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="trend",
+            metrics=["net_sales"],
+            period_start=date(2025, 7, 1),
+            period_end=date(2026, 6, 30),
+        ),
+        user_message="Show the net sales trend by city.",
+        current_date=date(2026, 8, 18),
+    )
+
+    contextualized = apply_dashboard_context(
+        request,
+        DashboardContext(
+            date_from=date(2025, 7, 1),
+            date_to=date(2026, 6, 30),
+            metric="net_sales",
+            grain="month",
+            group_by="store",
+            view="trend",
+            selected_group_ids=["ONLINE-SE", "STO-001"],
+        ),
+        user_message="Show the net sales trend by city.",
+    )
+
+    assert contextualized.operation == "trend"
+    assert contextualized.split_by == "city"
+    assert contextualized.scope.store_ids == []
+    assert contextualized.scope.cities == []
+
+
+def test_broad_period_analysis_defaults_to_monthly_trend():
+    request = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="summary",
+            metrics=["net_sales"],
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 3, 31),
+        ),
+        user_message="Analyze net sales during Q1 2026.",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert request.operation == "trend"
+    assert request.grain == "month"
+    assert request.presentation == "auto"
+
+    overview = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="summary",
+            metrics=["net_sales"],
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 3, 31),
+        ),
+        user_message="Show me a net sales overview for Q1 2026.",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert overview.operation == "trend"
+    assert overview.grain == "month"
+
+
+def test_explicit_total_question_remains_a_summary_snapshot():
+    request = build_new_request(
+        TurnInterpretation(
+            mode="new_analysis",
+            operation="trend",
+            metrics=["net_sales"],
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 3, 31),
+        ),
+        user_message="What was the total net sales during Q1 2026?",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert request.operation == "summary"
+    assert request.grain is None
 
 
 def test_modifier_patch_preserves_operation_period_grain_and_metrics():
@@ -81,6 +200,26 @@ def test_generic_butiker_does_not_imply_physical_channel():
         current_date=date(2026, 8, 18),
     )
     assert updated.scope.channels == []
+
+
+def test_average_order_value_requests_supporting_metrics():
+    request = build_new_request(
+        TurnInterpretation(mode="new_analysis", operation="summary"),
+        user_message="Explain the change in average order value.",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert request.metrics == ["net_sales", "orders"]
+
+
+def test_units_per_order_requests_supporting_metrics():
+    request = build_new_request(
+        TurnInterpretation(mode="new_analysis", operation="summary"),
+        user_message="Förklara förändringen i enheter per order.",
+        current_date=date(2026, 8, 18),
+    )
+
+    assert request.metrics == ["units", "orders"]
 
 
 def test_graph_it_is_forced_to_visualize_existing_when_data_exists():
@@ -315,7 +454,7 @@ def test_explicit_line_graph_after_summary_requires_new_monthly_trend():
             period_start=date(2026, 1, 1),
             period_end=date(2026, 3, 31),
         ),
-        user_message="Hur har det gått för oss under q1?",
+        user_message="Vad var den totala nettoomsättningen under q1?",
         current_date=date(2026, 8, 18),
     )
 

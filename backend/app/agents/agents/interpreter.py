@@ -18,6 +18,8 @@ Return only the structured TurnInterpretation.
 Current date: {current_date}
 User message: {user_message}
 UI language: {ui_language}
+Current dashboard context (JSON, or null):
+{dashboard_context_json}
 Reusable analytical results exist: {last_has_results}
 Current canonical analytical request (JSON, or null):
 {canonical_request_json}
@@ -26,6 +28,14 @@ CORE IDEA
 The application keeps one canonical analytical request across turns. For a
 follow-up, describe only what the user changed. Anything omitted remains
 unchanged deterministically.
+
+DASHBOARD CONTEXT
+- The dashboard context describes what the user is currently viewing.
+- When a new analytics question does not specify a period, use the context's
+  date_from and date_to as period_start and period_end.
+- When the user refers to "this", "the chart", or "current view", use the
+  context metric, grain, group_by and selected groups when relevant.
+- Explicit wording in the user message always overrides dashboard context.
 
 MODE
 Choose exactly one:
@@ -66,6 +76,11 @@ Choose product_overview for broad single-product questions such as
 Choose trend for a named product when the user explicitly asks for monthly,
 weekly, daily, quarterly or over-time development.
 
+For broader period questions such as "analyze sales during Q1", "show sales for
+this year" or "how did sales look?", prefer trend so the user gets a useful
+time-series chart. Use summary for explicit snapshot/total questions such as
+"how much", "what was the total", "vad var den totala" or a requested KPI.
+
 METRICS
 Canonical metric names:
 - units = units sold / enheter / sålda enheter
@@ -75,6 +90,10 @@ Canonical metric names:
 - discounts = discounts / rabatter
 - average_selling_price = average selling price / genomsnittligt försäljningspris
 - discount_rate = discount rate / rabattgrad
+- average order value / AOV / genomsnittligt ordervärde requires both
+  net_sales and orders so the answer can derive net_sales / orders
+- units per order / items per order / enheter per order requires both units
+  and orders so the answer can derive units / orders
 
 For "best-selling" / "worst-selling" / "bäst säljande" / "sämst säljande",
 rank_by=units unless the user explicitly names another metric.

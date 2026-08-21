@@ -7,8 +7,14 @@ from app.schemas.dashboard import (
     Grain,
     Metric,
     ProductSelectorItem,
+    ProductTableResponse,
+    ProductSortDirection,
     ProductTimeseriesResponse,
+    PerformanceTimeseriesResponse,
+    PerformanceTimeseriesRow,
     ProductsResponse,
+    SalesTimeseriesResponse,
+    SalesTimeseriesRow,
     StoreBreakdownResponse,
     StoreBreakdownRow,
     StoreGroupBy,
@@ -83,6 +89,37 @@ class DashboardService:
                     product_id=str(row["product_id"]),
                     product_name=str(row["product_name"]),
                     category=str(row["category"]),
+                    value=_float(row.get("value")),
+                )
+                for row in rows
+            ],
+        )
+
+    def sales_timeseries(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        grain: Grain,
+        metric: Metric,
+    ) -> SalesTimeseriesResponse:
+        _validate_dates(date_from, date_to)
+        rows = self._repository.fetch_sales_timeseries(
+            supplier_id=supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            grain=grain,
+            metric=metric,
+        )
+        return SalesTimeseriesResponse(
+            date_from=date_from,
+            date_to=date_to,
+            grain=grain,
+            metric=metric,
+            rows=[
+                SalesTimeseriesRow(
+                    period=row["period"],
                     value=_float(row.get("value")),
                 )
                 for row in rows
@@ -187,12 +224,103 @@ class DashboardService:
             ],
         )
 
+    def product_table(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        sort_by: Metric,
+        sort_direction: ProductSortDirection,
+        offset: int,
+        limit: int,
+    ) -> ProductTableResponse:
+        _validate_dates(date_from, date_to)
+        rows = self._repository.fetch_product_table(
+            supplier_id=supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            offset=offset,
+            limit=limit,
+        )
+        total = _int(rows[0].get("total_count")) if rows else 0
+        return ProductTableResponse(
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            offset=offset,
+            limit=limit,
+            total=total,
+            rows=[
+                TopProductsRow(
+                    rank=offset + index,
+                    product_id=str(row["product_id"]),
+                    product_name=str(row["product_name"]),
+                    category=str(row["category"]),
+                    net_sales=_float(row.get("net_sales")),
+                    gross_sales=_float(row.get("gross_sales")),
+                    units=_int(row.get("units")),
+                    orders=_int(row.get("orders")),
+                    discounts=_float(row.get("discounts")),
+                )
+                for index, row in enumerate(rows, start=1)
+            ],
+        )
+
+    def performance_timeseries(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        grain: Grain,
+        metric: Metric,
+        group_by: StoreGroupBy,
+        group_ids: list[str] | None,
+        limit_groups: int,
+    ) -> PerformanceTimeseriesResponse:
+        _validate_dates(date_from, date_to)
+        rows = self._repository.fetch_performance_timeseries(
+            supplier_id=supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            grain=grain,
+            metric=metric,
+            group_by=group_by,
+            group_ids=group_ids,
+            limit_groups=limit_groups,
+        )
+        return PerformanceTimeseriesResponse(
+            date_from=date_from,
+            date_to=date_to,
+            grain=grain,
+            metric=metric,
+            group_by=group_by,
+            limit_groups=limit_groups,
+            rows=[
+                PerformanceTimeseriesRow(
+                    period=row["period"],
+                    group_id=str(row["group_id"]),
+                    group_name=str(row["group_name"]),
+                    value=_float(row.get("value")),
+                )
+                for row in rows
+            ],
+        )
+
 
 def parse_product_ids(value: str | None) -> list[str] | None:
     if value is None:
         return None
     values = [item.strip() for item in value.split(",") if item.strip()]
     return values or None
+
+
+def parse_group_ids(value: str | None) -> list[str] | None:
+    return parse_product_ids(value)
 
 
 def _validate_dates(date_from: date | None, date_to: date | None) -> None:

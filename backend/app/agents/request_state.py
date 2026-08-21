@@ -17,10 +17,21 @@ from typing import Any
 from app.schemas.agent import (
     AnalysisRequestState,
     AnalysisScope,
+    DashboardContext,
     Metric,
     ScopePatch,
     TurnInterpretation,
     TurnMode,
+)
+
+
+_DASHBOARD_REFERENCE_PATTERNS = (
+    r"\bcurrent\s+(?:dashboard\s+)?view\b",
+    r"\bthis\s+(?:dashboard|view|chart|graph)\b",
+    r"\bthe\s+(?:current\s+)?(?:chart|graph)\b",
+    r"\baktuella\s+dashboardvyn\b",
+    r"\bden\s+(?:här|aktuella)\s+(?:dashboardvyn|vyn|grafen|diagrammet)\b",
+    r"\b(?:grafen|diagrammet)\b",
 )
 
 
@@ -124,6 +135,32 @@ _SUMMARY_PATTERNS = (
     r"\bsammanfatt(?:a|ning)\b",
     r"\böversikt\b",
     r"\btotal(?:t|er)?\b",
+)
+
+_BROAD_ANALYSIS_PATTERNS = (
+    r"\banaly[sz](?:e|ing|is)?\b",
+    r"\bwhat\s+stands?\s+out\b",
+    r"\bshow(?:\s+me)?\b",
+    r"\bhow\s+(?:did|has|have|is|are|was|were)\b",
+    r"\boverview\b",
+    r"\banalysera\b",
+    r"\bvad\s+sticker\s+ut\b",
+    r"\bvisa\b",
+    r"\bhur\s+(?:gick|går|har|såg|ser|var)\b",
+    r"\böversikt\b",
+)
+
+_SNAPSHOT_PATTERNS = (
+    r"\bhow\s+much\b",
+    r"\bwhat\s+(?:is|was|were)\s+(?:the\s+)?(?:total\s+)?",
+    r"\btotal(?:s|led)?\b",
+    r"\bsum(?:mary)?\b",
+    r"\bkpi\b",
+    r"\bhur\s+mycket\b",
+    r"\bvad\s+(?:är|var|blev)\s+(?:den\s+)?(?:totala\s+)?",
+    r"\btotal(?:t|en|a)?\b",
+    r"\bsumma\b",
+    r"\bsammanfatt(?:a|ning)\b",
 )
 
 _RANKING_PATTERNS = (
@@ -243,6 +280,24 @@ def coerce_request(value: Any) -> AnalysisRequestState | None:
     return None
 
 
+def coerce_dashboard_context(value: Any) -> DashboardContext | None:
+    if value is None:
+        return None
+    if isinstance(value, DashboardContext):
+        return value
+    if isinstance(value, dict):
+        try:
+            return DashboardContext.model_validate(value)
+        except Exception:
+            return None
+    if isinstance(value, str) and value.strip() and value.strip() != "null":
+        try:
+            return DashboardContext.model_validate_json(value)
+        except Exception:
+            return None
+    return None
+
+
 def request_to_json(request: AnalysisRequestState | None) -> str:
     if request is None:
         return "null"
@@ -251,6 +306,10 @@ def request_to_json(request: AnalysisRequestState | None) -> str:
 
 def _matches_any(text: str, patterns: tuple[str, ...]) -> bool:
     return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def references_dashboard_context(text: str) -> bool:
+    return _matches_any(text.casefold(), _DASHBOARD_REFERENCE_PATTERNS)
 
 
 def _infer_grain(text: str) -> str | None:
@@ -297,6 +356,18 @@ def _infer_metrics(text: str) -> list[Metric]:
     lowered = text.casefold()
     metrics: list[Metric] = []
 
+    if re.search(
+        r"\b(?:average order value|aov|genomsnittligt ordervärde)\b",
+        lowered,
+    ):
+        metrics.extend(["net_sales", "orders"])
+
+    if re.search(
+        r"\b(?:units per order|items per order|enheter per order)\b",
+        lowered,
+    ):
+        metrics.extend(["units", "orders"])
+
     patterns: tuple[tuple[Metric, tuple[str, ...]], ...] = (
         ("units", (
             r"\bunits?\b",
@@ -336,7 +407,8 @@ def _infer_metrics(text: str) -> list[Metric]:
 
     for metric, expressions in patterns:
         if any(re.search(expr, lowered) for expr in expressions):
-            metrics.append(metric)
+            if metric not in metrics:
+                metrics.append(metric)
 
     if (
         "net_sales" not in metrics
@@ -484,6 +556,14 @@ def _has_explicit_trend_intent(text: str) -> bool:
     )
 
 
+def _has_broad_analysis_intent(text: str) -> bool:
+    lowered = text.casefold()
+    return (
+        _matches_any(lowered, _BROAD_ANALYSIS_PATTERNS)
+        and not _matches_any(lowered, _SNAPSHOT_PATTERNS)
+    )
+
+
 def _infer_explicit_operation(
     text: str,
     product_query: str | None = None,
@@ -508,7 +588,10 @@ def _infer_explicit_operation(
     ):
         return "product_overview"
 
-    if _matches_any(lowered, _SUMMARY_PATTERNS):
+    if (
+        _matches_any(lowered, _SUMMARY_PATTERNS)
+        and not _has_broad_analysis_intent(lowered)
+    ):
         return "summary"
 
     return None
@@ -759,6 +842,119 @@ def _normalize_operation_fields(
     return request.model_copy(update=updates)
 
 
+def apply_dashboard_context(
+    request: AnalysisRequestState,
+    dashboard: DashboardContext | None,
+    *,
+    user_message: str,
+) -> AnalysisRequestState:
+    """Apply visible dashboard semantics without relying on the interpreter.
+
+    Explicit wording remains authoritative. Selected series are inherited only
+    when the user refers to the current view and its grouping matches the
+    requested grouping, so a request for cities cannot accidentally retain
+    store IDs from a store chart.
+    """
+
+    text = user_message.casefold()
+    explicit_group = _infer_group_by(text)
+    references_dashboard = references_dashboard_context(text)
+
+    if dashboard is None and explicit_group is None:
+        return request
+
+    values = request.model_dump()
+    explicit_operation = _infer_explicit_operation(
+        text,
+        request.pending_product_query,
+    )
+
+    if references_dashboard and dashboard is not None:
+        if _infer_period(text, dashboard.date_to) is None:
+            values["period_start"] = dashboard.date_from
+            values["period_end"] = dashboard.date_to
+
+        if not _infer_metrics(text) and dashboard.metric is not None:
+            values["metrics"] = [dashboard.metric]
+
+        if explicit_operation is None and dashboard.view is not None:
+            values["operation"] = dashboard.view
+
+    operation = values.get("operation")
+    group = explicit_group or (
+        dashboard.group_by
+        if references_dashboard and dashboard is not None
+        else None
+    )
+
+    if explicit_group is not None and operation == "summary":
+        # "Sales by city/store/channel" is a grouped snapshot unless the user
+        # or current dashboard explicitly asks for a time trend.
+        operation = (
+            dashboard.view
+            if references_dashboard
+            and dashboard is not None
+            and dashboard.view is not None
+            else "ranking"
+        )
+        values["operation"] = operation
+
+    if operation == "trend":
+        if group is not None:
+            values["split_by"] = group
+        if (
+            references_dashboard
+            and dashboard is not None
+            and dashboard.grain is not None
+            and _infer_grain(text) is None
+        ):
+            values["grain"] = dashboard.grain
+
+        if (
+            references_dashboard
+            and dashboard is not None
+            and group is not None
+            and group == dashboard.group_by
+            and dashboard.selected_group_ids
+        ):
+            selected = dashboard.selected_group_ids[:10]
+            scope = AnalysisScope.model_validate(values.get("scope") or {})
+            scope_values = scope.model_dump()
+            if group == "store":
+                scope_values["store_ids"] = selected
+            elif group == "city":
+                scope_values["cities"] = selected
+            elif group == "channel":
+                scope_values["channels"] = [
+                    item.casefold()
+                    for item in selected
+                    if item.casefold() in {"online", "physical"}
+                ]
+            values["scope"] = scope_values
+            values["series_limit"] = len(selected)
+
+    elif operation == "ranking" and group is not None:
+        values["group_by"] = group
+        rank_metric = next(
+            (
+                metric
+                for metric in values.get("metrics") or []
+                if metric in {
+                    "units",
+                    "net_sales",
+                    "gross_sales",
+                    "discounts",
+                    "orders",
+                }
+            ),
+            None,
+        )
+        values["rank_by"] = rank_metric or values.get("rank_by") or "units"
+
+    contextualized = AnalysisRequestState.model_validate(values)
+    return _normalize_operation_fields(contextualized)
+
+
 def build_new_request(
     interpretation: TurnInterpretation,
     *,
@@ -781,6 +977,7 @@ def build_new_request(
     # for a time-series/trend.
     operation = (
         explicit_operation
+        or ("trend" if _has_broad_analysis_intent(text) else None)
         or interpretation.operation
         or _infer_operation(text, interpretation.product_query)
     )

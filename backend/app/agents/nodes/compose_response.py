@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from google.adk.agents.context import Context
 from google.adk.workflow import BaseNode, node
 
 from app.agents.answer_builder import build_short_answer
+from app.agents.analysis_facts import (
+    facts_have_data,
+    render_analysis_facts,
+)
 from app.agents.request_state import coerce_request
 from app.agents.state import ExecutedToolCall, StateKeys
 from app.schemas.agent import (
@@ -66,6 +71,79 @@ def _coerce_viz_datasets(
     ]
 
 
+def _coerce_facts(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            raw = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return raw if isinstance(raw, dict) else {}
+    return {}
+
+
+_FALSE_NO_DATA = re.compile(
+    r"\b(?:no\b.{0,24}\bdata|data\b.{0,24}\b(?:unavailable|not available)|"
+    r"data\b.{0,32}\b(?:not specifically (?:provided|specified)|not specified)|"
+    r"no (?:specific )?results?|did not receive|"
+    r"inga\b.{0,24}\bdata|data\b.{0,24}\b(?:saknas|inte tillgänglig)|"
+    r"data\b.{0,32}\b(?:inte specifikt angiven|inte angiven)|"
+    r"inga (?:specifika )?resultat|inte fått (?:några )?(?:specifika )?resultat)\b",
+    flags=re.IGNORECASE,
+)
+_GENERATED_MEDIA = re.compile(
+    r"!\[[^\]]*\]\([^)]*\)|data:image/",
+    flags=re.IGNORECASE,
+)
+_UNSUPPORTED_CAUSATION = re.compile(
+    r"\b(?:caused?|due to|driven by|influenced?|led to|resulted in|"
+    r"seasonality|seasonal|på grund av|orsak(?:ad|ade|at)|drevs av|"
+    r"drivet av|påverk(?:ade|at)|ledde till|säsong(?:smönster|sbetonad|seffekt)?)\b",
+    flags=re.IGNORECASE,
+)
+
+
+def _generated_analysis_is_compatible(
+    analysis: str,
+    facts: dict[str, Any],
+) -> bool:
+    if not analysis.strip():
+        return False
+    if facts_have_data(facts) and _FALSE_NO_DATA.search(analysis):
+        return False
+    if _GENERATED_MEDIA.search(analysis):
+        return False
+    if _UNSUPPORTED_CAUSATION.search(analysis):
+        return False
+    comparison = facts.get("comparison_period")
+    effective = facts.get("effective_period")
+    if (
+        isinstance(comparison, dict)
+        and comparison.get("start")
+        and comparison.get("end")
+        and (
+            "%" in analysis
+            or re.search(r"\bprevious period\b|\bföregående period\b", analysis, re.IGNORECASE)
+        )
+        and (
+            str(comparison["start"]) not in analysis
+            or str(comparison["end"]) not in analysis
+            or (
+                isinstance(effective, dict)
+                and effective.get("start")
+                and effective.get("end")
+                and (
+                    str(effective["start"]) not in analysis
+                    or str(effective["end"]) not in analysis
+                )
+            )
+        )
+    ):
+        return False
+    return True
+
+
 def build_compose_response_node() -> BaseNode:
     def compose_response(
         ctx: Context,
@@ -78,6 +156,7 @@ def build_compose_response_node() -> BaseNode:
         effective_mode: str = "",
         conversation_id: str = "",
         ui_language: str = "en",
+        analysis_facts_json: Any = "{}",
     ) -> None:
         results = [
             ExecutedToolCall.model_validate(
@@ -105,10 +184,18 @@ def build_compose_response_node() -> BaseNode:
         request = coerce_request(
             canonical_request_json
         )
+        facts = _coerce_facts(analysis_facts_json)
+
+        generated_analysis = (analysis or "").strip()
+        if generated_analysis and not _generated_analysis_is_compatible(
+            generated_analysis,
+            facts,
+        ):
+            generated_analysis = render_analysis_facts(facts, ui_language)
 
         message = (
             (direct_message or "").strip()
-            or (analysis or "").strip()
+            or generated_analysis
         )
 
         if (

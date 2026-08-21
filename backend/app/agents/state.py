@@ -15,6 +15,8 @@ class StateKeys:
     USER_MESSAGE = "user_message"
     UI_LANGUAGE = "ui_language"
     CURRENT_DATE = "current_date"
+    DASHBOARD_CONTEXT_JSON = "dashboard_context_json"
+    WIDGET_ANALYSIS_REQUEST_JSON = "widget_analysis_request_json"
     CONVERSATION_ID = "conversation_id"
     MCP_TOKEN = "mcp_token"
 
@@ -29,6 +31,7 @@ class StateKeys:
     EFFECTIVE_MODE = "effective_mode"
     TOOL_RESULTS = "tool_results"
     BUSINESS_RESULTS_JSON = "business_results_json"
+    ANALYSIS_FACTS_JSON = "analysis_facts_json"
     VISUALIZATION_DATASETS_JSON = "visualization_datasets_json"
     VISUALIZATION_PLAN = "visualization_plan"
     ANALYSIS = "analysis"
@@ -53,6 +56,7 @@ TRANSIENT_STATE_RESET = {
     StateKeys.EFFECTIVE_MODE: None,
     StateKeys.TOOL_RESULTS: [],
     StateKeys.BUSINESS_RESULTS_JSON: "[]",
+    StateKeys.ANALYSIS_FACTS_JSON: "{}",
     StateKeys.VISUALIZATION_DATASETS_JSON: "[]",
     StateKeys.VISUALIZATION_PLAN: None,
     StateKeys.ANALYSIS: None,

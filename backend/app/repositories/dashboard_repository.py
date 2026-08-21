@@ -6,7 +6,12 @@ from typing import Any
 from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
 
-from app.schemas.dashboard import Grain, Metric, StoreGroupBy
+from app.schemas.dashboard import (
+    Grain,
+    Metric,
+    ProductSortDirection,
+    StoreGroupBy,
+)
 
 _METRIC_SQL: dict[Metric, str] = {
     "net_sales": "SUM(f.net_sales)",
@@ -88,6 +93,71 @@ class DashboardRepository:
             GROUP BY f.product_id, f.product_name, f.category
             ORDER BY {metric_sql} DESC, f.product_name ASC
             LIMIT :limit
+            """
+        )
+        return [dict(row) for row in self._connection.execute(stmt, params).mappings().all()]
+
+    def fetch_product_table(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        sort_by: Metric,
+        sort_direction: ProductSortDirection,
+        offset: int,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        where_sql, params = _scope(
+            supplier_id=supplier_id, date_from=date_from, date_to=date_to
+        )
+        metric_sql = _METRIC_SQL[sort_by]
+        direction_sql = "ASC" if sort_direction == "asc" else "DESC"
+        params.update({"offset": offset, "limit": limit})
+        stmt = text(
+            f"""
+            SELECT
+                f.product_id,
+                f.product_name,
+                f.category,
+                COALESCE(SUM(f.net_sales), 0) AS net_sales,
+                COALESCE(SUM(f.gross_sales), 0) AS gross_sales,
+                COALESCE(SUM(f.quantity), 0) AS units,
+                COUNT(DISTINCT f.order_id) AS orders,
+                COALESCE(SUM(f.discounts), 0) AS discounts,
+                COUNT(*) OVER() AS total_count
+            FROM v_supplier_sales_facts f
+            WHERE {where_sql}
+            GROUP BY f.product_id, f.product_name, f.category
+            ORDER BY {metric_sql} {direction_sql}, f.product_name ASC, f.product_id ASC
+            LIMIT :limit OFFSET :offset
+            """
+        )
+        return [dict(row) for row in self._connection.execute(stmt, params).mappings().all()]
+
+    def fetch_sales_timeseries(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        grain: Grain,
+        metric: Metric,
+    ) -> list[dict[str, Any]]:
+        where_sql, params = _scope(
+            supplier_id=supplier_id, date_from=date_from, date_to=date_to
+        )
+        period_sql = _GRAIN_SQL[grain]
+        metric_sql = _METRIC_SQL[metric]
+        stmt = text(
+            f"""
+            SELECT
+                {period_sql} AS period,
+                COALESCE({metric_sql}, 0) AS value
+            FROM v_supplier_sales_facts f
+            WHERE {where_sql}
+            GROUP BY period
+            ORDER BY period ASC
             """
         )
         return [dict(row) for row in self._connection.execute(stmt, params).mappings().all()]
@@ -195,6 +265,56 @@ class DashboardRepository:
         )
         return [dict(row) for row in self._connection.execute(stmt, params).mappings().all()]
 
+    def fetch_performance_timeseries(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        grain: Grain,
+        metric: Metric,
+        group_by: StoreGroupBy,
+        group_ids: list[str] | None,
+        limit_groups: int,
+    ) -> list[dict[str, Any]]:
+        effective_group_ids = group_ids
+        if not effective_group_ids:
+            effective_group_ids = self._fetch_top_group_ids(
+                supplier_id=supplier_id,
+                date_from=date_from,
+                date_to=date_to,
+                metric=metric,
+                group_by=group_by,
+                limit=limit_groups,
+            )
+
+        if not effective_group_ids:
+            return []
+
+        where_sql, params = _scope(
+            supplier_id=supplier_id, date_from=date_from, date_to=date_to
+        )
+        group_id_sql, group_name_sql = _STORE_GROUP_SQL[group_by]
+        period_sql = _GRAIN_SQL[grain]
+        metric_sql = _METRIC_SQL[metric]
+        params["group_ids"] = effective_group_ids
+        stmt = text(
+            f"""
+            SELECT
+                {period_sql} AS period,
+                {group_id_sql} AS group_id,
+                {group_name_sql} AS group_name,
+                COALESCE({metric_sql}, 0) AS value
+            FROM v_supplier_sales_facts f
+            WHERE {where_sql}
+              AND {group_id_sql} IN :group_ids
+            GROUP BY period, {group_id_sql}, {group_name_sql}
+            ORDER BY period ASC, group_name ASC
+            """
+        ).bindparams(bindparam("group_ids", expanding=True))
+
+        return [dict(row) for row in self._connection.execute(stmt, params).mappings().all()]
+
     def _fetch_top_product_ids(
         self,
         *,
@@ -216,6 +336,34 @@ class DashboardRepository:
             WHERE {where_sql}
             GROUP BY f.product_id
             ORDER BY {metric_sql} DESC, f.product_id ASC
+            LIMIT :limit
+            """
+        )
+        return [str(row[0]) for row in self._connection.execute(stmt, params).all()]
+
+    def _fetch_top_group_ids(
+        self,
+        *,
+        supplier_id: str,
+        date_from: date | None,
+        date_to: date | None,
+        metric: Metric,
+        group_by: StoreGroupBy,
+        limit: int,
+    ) -> list[str]:
+        where_sql, params = _scope(
+            supplier_id=supplier_id, date_from=date_from, date_to=date_to
+        )
+        group_id_sql, _ = _STORE_GROUP_SQL[group_by]
+        metric_sql = _METRIC_SQL[metric]
+        params["limit"] = limit
+        stmt = text(
+            f"""
+            SELECT {group_id_sql} AS group_id
+            FROM v_supplier_sales_facts f
+            WHERE {where_sql}
+            GROUP BY {group_id_sql}
+            ORDER BY {metric_sql} DESC, group_id ASC
             LIMIT :limit
             """
         )

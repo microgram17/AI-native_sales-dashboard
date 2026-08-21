@@ -10,13 +10,21 @@ from app.schemas.dashboard import (
     Grain,
     Metric,
     ProductTimeseriesResponse,
+    PerformanceTimeseriesResponse,
+    ProductTableResponse,
+    ProductSortDirection,
     ProductsResponse,
+    SalesTimeseriesResponse,
     StoreBreakdownResponse,
     StoreGroupBy,
     SummaryResponse,
     TopProductsResponse,
 )
-from app.services.dashboard_service import DashboardRequestError, parse_product_ids
+from app.services.dashboard_service import (
+    DashboardRequestError,
+    parse_group_ids,
+    parse_product_ids,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -58,6 +66,27 @@ def get_product_timeseries(
             metric=metric,
             product_ids=parse_product_ids(product_ids),
             limit_products=limit_products,
+        )
+    except DashboardRequestError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/sales-timeseries", response_model=SalesTimeseriesResponse)
+def get_sales_timeseries(
+    context: RequestContextDep,
+    service: DashboardServiceDep,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    grain: Grain = "month",
+    metric: Metric = "net_sales",
+) -> SalesTimeseriesResponse:
+    try:
+        return service.sales_timeseries(
+            supplier_id=context.supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            grain=grain,
+            metric=metric,
         )
     except DashboardRequestError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -117,6 +146,58 @@ def get_store_breakdown(
             date_to=date_to,
             metric=metric,
             group_by=group_by,
+        )
+    except DashboardRequestError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/product-table", response_model=ProductTableResponse)
+def get_product_table(
+    context: RequestContextDep,
+    service: DashboardServiceDep,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    sort_by: Metric = "net_sales",
+    sort_direction: ProductSortDirection = "desc",
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 25,
+) -> ProductTableResponse:
+    try:
+        return service.product_table(
+            supplier_id=context.supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            offset=offset,
+            limit=limit,
+        )
+    except DashboardRequestError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/performance-timeseries", response_model=PerformanceTimeseriesResponse)
+def get_performance_timeseries(
+    context: RequestContextDep,
+    service: DashboardServiceDep,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    grain: Grain = "month",
+    metric: Metric = "net_sales",
+    group_by: StoreGroupBy = "store",
+    group_ids: str | None = None,
+    limit_groups: Annotated[int, Query(ge=1, le=5)] = 3,
+) -> PerformanceTimeseriesResponse:
+    try:
+        return service.performance_timeseries(
+            supplier_id=context.supplier_id,
+            date_from=date_from,
+            date_to=date_to,
+            grain=grain,
+            metric=metric,
+            group_by=group_by,
+            group_ids=parse_group_ids(group_ids),
+            limit_groups=limit_groups,
         )
     except DashboardRequestError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

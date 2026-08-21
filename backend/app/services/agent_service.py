@@ -28,6 +28,7 @@ from app.integrations.mcp.context_token import (
     mint_mcp_context_token,
 )
 from app.schemas.agent import (
+    AnalysisRequestState,
     AgentQueryRequest,
     AgentQueryResponse,
 )
@@ -148,6 +149,15 @@ class AgentService:
                 request.language,
             StateKeys.CURRENT_DATE:
                 date.today().isoformat(),
+            StateKeys.DASHBOARD_CONTEXT_JSON:
+                json.dumps(
+                    request.dashboard_context.model_dump(mode="json")
+                    if request.dashboard_context
+                    else None,
+                    ensure_ascii=False,
+                ),
+            StateKeys.WIDGET_ANALYSIS_REQUEST_JSON:
+                _widget_analysis_request_json(request),
             StateKeys.MCP_TOKEN:
                 token,
             StateKeys.MCP_CAPABILITIES_JSON:
@@ -226,3 +236,26 @@ class AgentService:
                 else "No response was produced."
             ),
         )
+
+
+def _widget_analysis_request_json(request: AgentQueryRequest) -> str:
+    widget = request.widget_analysis
+    if widget is None:
+        return "null"
+
+    canonical = AnalysisRequestState(
+        operation=widget.operation,
+        metrics=widget.metrics,
+        grain=widget.grain,
+        group_by=widget.group_by,
+        rank_by=widget.rank_by,
+        split_by=widget.split_by,
+        limit=widget.limit,
+        series_limit=widget.series_limit,
+        period_start=widget.period_start,
+        period_end=widget.period_end,
+        scope=widget.scope,
+        presentation="auto",
+        interpretation_requested=True,
+    )
+    return canonical.model_dump_json()

@@ -1,11 +1,20 @@
-import type { Metric, TopProductsRow } from '../../../types/dashboard'
+import type {
+  Metric,
+  ProductSortDirection,
+  TopProductsRow,
+} from '../../../types/dashboard'
 import { useTranslation } from '../../../i18n/LanguageContext'
 
 interface TopProductsTableProps {
   rows: TopProductsRow[]
   loading: boolean
   sortBy: Metric
-  onSortByChange: (m: Metric) => void
+  sortDirection: ProductSortDirection
+  onSortChange: (metric: Metric, direction: ProductSortDirection) => void
+  hasMore: boolean
+  loadingMore: boolean
+  total: number
+  onLoadMore: () => void
 }
 
 const fmtSEK = (n: number) =>
@@ -18,7 +27,17 @@ const fmtSEK = (n: number) =>
 const fmtInt = (n: number) =>
   new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(n)
 
-export function TopProductsTable({ rows, loading, sortBy, onSortByChange }: TopProductsTableProps) {
+export function TopProductsTable({
+  rows,
+  loading,
+  sortBy,
+  sortDirection,
+  onSortChange,
+  hasMore,
+  loadingMore,
+  total,
+  onLoadMore,
+}: TopProductsTableProps) {
   const { t } = useTranslation()
 
   const COLUMNS: { key: Metric; label: string; format: (v: number) => string }[] = [
@@ -33,27 +52,51 @@ export function TopProductsTable({ rows, loading, sortBy, onSortByChange }: TopP
   if (!rows.length) return <div className="table-placeholder">{t.noProducts}</div>
 
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div
+      className="top-products-table-scroll"
+      onScroll={(event) => {
+        const element = event.currentTarget
+        const nearBottom =
+          element.scrollHeight - element.scrollTop - element.clientHeight < 80
+        if (nearBottom && hasMore && !loadingMore) {
+          onLoadMore()
+        }
+      }}
+    >
       <table className="products-table">
         <thead>
           <tr>
             <th className="num">#</th>
             <th>{t.colProduct}</th>
             <th>{t.colCategory}</th>
-            {COLUMNS.map((col) => (
+            {COLUMNS.map((column) => (
               <th
-                key={col.key}
+                key={column.key}
                 className="num"
-                onClick={() => onSortByChange(col.key)}
-                style={{
-                  cursor: 'pointer',
-                  color: sortBy === col.key ? 'var(--accent)' : undefined,
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-                title={t.sortBy(col.label)}
+                aria-sort={
+                  sortBy === column.key
+                    ? sortDirection === 'desc'
+                      ? 'descending'
+                      : 'ascending'
+                    : 'none'
+                }
               >
-                {col.label}{sortBy === col.key ? ' ↓' : ''}
+                <button
+                  type="button"
+                  className={sortBy === column.key ? 'active' : ''}
+                  onClick={() => onSortChange(
+                    column.key,
+                    sortBy === column.key && sortDirection === 'desc'
+                      ? 'asc'
+                      : 'desc',
+                  )}
+                  title={t.sortBy(column.label)}
+                >
+                  {column.label}
+                  {sortBy === column.key
+                    ? sortDirection === 'desc' ? ' ↓' : ' ↑'
+                    : ''}
+                </button>
               </th>
             ))}
           </tr>
@@ -64,19 +107,27 @@ export function TopProductsTable({ rows, loading, sortBy, onSortByChange }: TopP
               <td className="num secondary">{row.rank}</td>
               <td>{row.product_name}</td>
               <td className="secondary">{row.category}</td>
-              {COLUMNS.map((col) => (
+              {COLUMNS.map((column) => (
                 <td
-                  key={col.key}
-                  className="num"
-                  style={{ fontWeight: sortBy === col.key ? 600 : undefined }}
+                  key={column.key}
+                  className={`num${sortBy === column.key ? ' sorted' : ''}`}
                 >
-                  {col.format(row[col.key])}
+                  {column.format(row[column.key])}
                 </td>
               ))}
             </tr>
           ))}
         </tbody>
-      </table>
+          <tfoot>
+            <tr>
+              <td colSpan={COLUMNS.length + 3}>
+                {loadingMore
+                  ? t.loadingMoreProducts
+                  : t.productsLoaded(rows.length, total)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
     </div>
   )
 }

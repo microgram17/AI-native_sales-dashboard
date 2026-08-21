@@ -11,6 +11,8 @@ export interface VisualizationSpec {
    * Empty/undefined means a normal single-axis visualization.
    */
   secondary_y_keys?: string[]
+  /** Metrics that can be selected locally without another agent request. */
+  selectable_y_keys?: string[]
   series_key?: string | null
   columns: string[]
 }
@@ -40,10 +42,44 @@ export interface Dataset {
 
 export type UiLanguage = 'en' | 'sv'
 
+export interface DashboardChatContext {
+  date_from: string
+  date_to: string
+  metric?: string
+  grain?: string
+  group_by?: string
+  view?: string
+  selected_group_ids?: string[]
+}
+
+export interface WidgetAnalysisScope {
+  channels?: Array<'online' | 'physical'>
+  cities?: string[]
+  store_ids?: string[]
+  categories?: string[]
+}
+
+export interface WidgetAnalysisRequest {
+  widget: 'kpi' | 'sales_trend' | 'performance'
+  operation: 'summary' | 'trend' | 'ranking'
+  metrics: string[]
+  period_start: string
+  period_end: string
+  grain?: 'day' | 'week' | 'month' | 'quarter'
+  group_by?: 'product' | 'category' | 'store' | 'city' | 'channel'
+  rank_by?: 'units' | 'net_sales' | 'gross_sales' | 'discounts' | 'orders'
+  split_by?: 'product' | 'category' | 'store' | 'city' | 'channel'
+  limit?: number
+  series_limit?: number
+  scope?: WidgetAnalysisScope
+}
+
 export interface AgentQueryRequest {
   message: string
   conversation_id?: string | null
   language: UiLanguage
+  dashboard_context?: DashboardChatContext
+  widget_analysis?: WidgetAnalysisRequest
 }
 
 export interface AgentQueryResponse {

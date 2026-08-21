@@ -2,8 +2,12 @@ import { apiFetch } from './client'
 import type {
   Grain,
   Metric,
+  PerformanceTimeseriesResponse,
+  ProductTableResponse,
+  ProductSortDirection,
   ProductsResponse,
   ProductTimeseriesResponse,
+  SalesTimeseriesResponse,
   StoreBreakdownResponse,
   StoreGroupBy,
   SummaryResponse,
@@ -35,10 +39,22 @@ export interface ProductTimeseriesParams {
   limit_products?: number
 }
 
+export interface SalesTimeseriesParams extends DateRangeParams {
+  grain?: Grain
+  metric?: Metric
+}
+
 export interface TopProductsParams {
   date_from?: string
   date_to?: string
   sort_by?: Metric
+  limit?: number
+}
+
+export interface ProductTableParams extends DateRangeParams {
+  sort_by?: Metric
+  sort_direction?: ProductSortDirection
+  offset?: number
   limit?: number
 }
 
@@ -52,6 +68,12 @@ export interface StoreBreakdownParams extends DateRangeParams {
   group_by?: StoreGroupBy
 }
 
+export interface PerformanceTimeseriesParams extends StoreBreakdownParams {
+  grain?: Grain
+  group_ids?: string
+  limit_groups?: number
+}
+
 export const dashboardApi = {
   getSummary: (params: SummaryParams) =>
     apiFetch<SummaryResponse>(buildUrl('/dashboard/summary', params)),
@@ -61,9 +83,19 @@ export const dashboardApi = {
       buildUrl('/dashboard/product-timeseries', params),
     ),
 
+  getSalesTimeseries: (params: SalesTimeseriesParams) =>
+    apiFetch<SalesTimeseriesResponse>(
+      buildUrl('/dashboard/sales-timeseries', params),
+    ),
+
   getTopProducts: (params: TopProductsParams) =>
     apiFetch<TopProductsResponse>(
       buildUrl('/dashboard/top-products', params),
+    ),
+
+  getProductTable: (params: ProductTableParams) =>
+    apiFetch<ProductTableResponse>(
+      buildUrl('/dashboard/product-table', params),
     ),
 
   getProducts: (params: DateRangeParams) =>
@@ -72,5 +104,11 @@ export const dashboardApi = {
   getStoreBreakdown: (params: StoreBreakdownParams) =>
     apiFetch<StoreBreakdownResponse>(
       buildUrl('/dashboard/store-breakdown', params),
+    ),
+
+
+  getPerformanceTimeseries: (params: PerformanceTimeseriesParams) =>
+    apiFetch<PerformanceTimeseriesResponse>(
+      buildUrl('/dashboard/performance-timeseries', params),
     ),
 }

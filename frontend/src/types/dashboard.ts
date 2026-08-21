@@ -7,6 +7,7 @@ export type Metric =
 
 export type Grain = 'week' | 'month'
 export type StoreGroupBy = 'store' | 'city' | 'channel'
+export type ProductSortDirection = 'asc' | 'desc'
 
 export interface SummaryResponse {
   date_from: string | null
@@ -35,6 +36,19 @@ export interface ProductTimeseriesResponse {
   rows: TimeseriesRow[]
 }
 
+export interface SalesTimeseriesRow {
+  period: string
+  value: number
+}
+
+export interface SalesTimeseriesResponse {
+  date_from: string | null
+  date_to: string | null
+  grain: Grain
+  metric: Metric
+  rows: SalesTimeseriesRow[]
+}
+
 export interface TopProductsRow {
   rank: number
   product_id: string
@@ -52,6 +66,17 @@ export interface TopProductsResponse {
   date_to: string | null
   sort_by: Metric
   limit: number
+  rows: TopProductsRow[]
+}
+
+export interface ProductTableResponse {
+  date_from: string | null
+  date_to: string | null
+  sort_by: Metric
+  sort_direction: ProductSortDirection
+  offset: number
+  limit: number
+  total: number
   rows: TopProductsRow[]
 }
 
@@ -82,3 +107,22 @@ export interface StoreBreakdownResponse {
   group_by: StoreGroupBy
   rows: StoreBreakdownRow[]
 }
+
+export interface PerformanceTimeseriesRow {
+  period: string
+  group_id: string
+  group_name: string
+  value: number
+}
+
+export interface PerformanceTimeseriesResponse {
+  date_from: string | null
+  date_to: string | null
+  grain: Grain
+  metric: Metric
+  group_by: StoreGroupBy
+  limit_groups: number
+  rows: PerformanceTimeseriesRow[]
+}
+
+export type PerformanceView = 'ranking' | 'trend'

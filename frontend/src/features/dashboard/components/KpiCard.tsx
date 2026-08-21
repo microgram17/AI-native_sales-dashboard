@@ -5,6 +5,8 @@ interface KpiCardProps {
   comparisonLabel?: string
   comparisonLoading?: boolean
   loading?: boolean
+  explainLabel?: string
+  onExplain?: () => void
 }
 
 function formatChange(value: number): string {
@@ -22,6 +24,8 @@ export function KpiCard({
   comparisonLabel,
   comparisonLoading = false,
   loading = false,
+  explainLabel,
+  onExplain,
 }: KpiCardProps) {
   const changeClass =
     changePercent === null ||
@@ -61,6 +65,16 @@ export function KpiCard({
             {comparisonLabel}
           </span>
         </div>
+      )}
+
+      {onExplain && explainLabel && !loading && (
+        <button
+          type="button"
+          className="kpi-explain-button"
+          onClick={onExplain}
+        >
+          {explainLabel}
+        </button>
       )}
     </div>
   )

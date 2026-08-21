@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.visualization import VisualizationDataset, VisualizationSpec
 
@@ -51,16 +51,16 @@ Channel = Literal["online", "physical"]
 Presentation = Literal["auto", "chart", "cards", "table"]
 
 
-class AgentQueryRequest(BaseModel):
-    """Request body for POST /agent/query.
+class DashboardContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    Supplier identity intentionally does not appear here. It comes from trusted
-    authenticated RequestContext on the server.
-    """
-
-    message: str
-    conversation_id: str | None = None
-    language: UiLanguage = "sv"
+    date_from: date
+    date_to: date
+    metric: Metric | None = None
+    grain: Grain | None = None
+    group_by: GroupBy | None = None
+    view: Literal["ranking", "trend"] | None = None
+    selected_group_ids: list[str] = Field(default_factory=list)
 
 
 class ScopePatch(BaseModel):
@@ -122,6 +122,81 @@ class AnalysisScope(BaseModel):
     cities: list[str] = Field(default_factory=list)
     store_ids: list[str] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
+
+
+class DashboardWidgetAnalysis(BaseModel):
+    """Validated analytical scope attached to an Explain-with-AI action."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    widget: Literal["kpi", "sales_trend", "performance"]
+    operation: Literal["summary", "trend", "ranking"]
+    metrics: list[Metric] = Field(min_length=1)
+    period_start: date
+    period_end: date
+    grain: Grain | None = None
+    group_by: GroupBy | None = None
+    rank_by: RankMetric | None = None
+    split_by: GroupBy | None = None
+    limit: int = Field(default=10, ge=1, le=20)
+    series_limit: int = Field(default=3, ge=1, le=10)
+    scope: AnalysisScope = Field(default_factory=AnalysisScope)
+
+    @model_validator(mode="after")
+    def validate_widget_semantics(self) -> DashboardWidgetAnalysis:
+        if self.period_start > self.period_end:
+            raise ValueError("period_start must be on or before period_end")
+
+        if self.widget == "kpi" and self.operation != "summary":
+            raise ValueError("KPI widgets require a summary operation")
+
+        if self.widget == "sales_trend":
+            if self.operation != "trend" or self.split_by is not None:
+                raise ValueError(
+                    "Sales-trend widgets require an unsplit trend operation"
+                )
+
+        if self.widget == "performance":
+            dimensions = {"store", "city", "channel"}
+            if self.operation == "ranking":
+                if self.group_by not in dimensions or self.rank_by is None:
+                    raise ValueError(
+                        "Performance rankings require a supported group and metric"
+                    )
+            elif self.operation == "trend":
+                if self.split_by not in dimensions:
+                    raise ValueError(
+                        "Performance trends require a supported split dimension"
+                    )
+                selected = {
+                    "store": self.scope.store_ids,
+                    "city": self.scope.cities,
+                    "channel": self.scope.channels,
+                }[self.split_by]
+                if not selected:
+                    raise ValueError(
+                        "Performance trends require the selected widget series"
+                    )
+            else:
+                raise ValueError(
+                    "Performance widgets require ranking or trend analysis"
+                )
+
+        return self
+
+
+class AgentQueryRequest(BaseModel):
+    """Request body for POST /agent/query.
+
+    Supplier identity intentionally does not appear here. It comes from trusted
+    authenticated RequestContext on the server.
+    """
+
+    message: str
+    conversation_id: str | None = None
+    language: UiLanguage = "sv"
+    dashboard_context: DashboardContext | None = None
+    widget_analysis: DashboardWidgetAnalysis | None = None
 
 
 class CanonicalProduct(BaseModel):

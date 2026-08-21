@@ -22,6 +22,8 @@ export interface Translations {
   grossSales: string
   unitsSold: string
   orders: string
+  averageOrderValue: string
+  unitsPerOrder: string
   // Column / metric labels
   units: string
   discounts: string
@@ -29,8 +31,22 @@ export interface Translations {
   productRevenueTrend: string
   productTrendTitle: (metricLabel: string) => string
   topProducts: string
+  productsTable: string
   storeBreakdown: string
+  salesTrendTitle: (metricLabel: string) => string
+  performanceTitle: (metricLabel: string, groupLabel: string) => string
+  productAnalysis: string
+  productAnalysisDescription: string
+  groupBy: string
+  groupStore: string
+  groupCity: string
+  groupChannel: string
+  onlineStore: string
+  channelOnline: string
+  channelPhysical: string
+  unknownGroup: string
   chat: string
+  askSalesData: string
   // Chat panel
   chatPlaceholder: string
   chatEmpty: string
@@ -38,6 +54,12 @@ export interface Translations {
   chatSend: string
   chatError: string
   newConversation: string
+  chatSuggestions: string[]
+  chatContext: (dateFrom: string, dateTo: string) => string
+  explainWithAi: string
+  explainKpi: (metricLabel: string) => string
+  explainTrend: (metricLabel: string) => string
+  explainPerformance: (metricLabel: string, groupLabel: string) => string
   // Shared states
   loading: string
   // TopProductsTable
@@ -45,6 +67,8 @@ export interface Translations {
   colProduct: string
   colCategory: string
   sortBy: (label: string) => string
+  loadingMoreProducts: string
+  productsLoaded: (loaded: number, total: number) => string
   // ProductTimeseriesChart
   grain: string
   grainMonth: string
@@ -57,6 +81,14 @@ export interface Translations {
   noTimeseriesData: string
   // StoreBreakdownChart
   noStoreData: string
+  noPerformanceTrendData: string
+  view: string
+  ranking: string
+  trend: string
+  addComparison: string
+  removeComparison: string
+  currentPeriod: string
+  previousPeriod: string
   // Agent visualizations
   vizNoMetrics: string
   vizNoChartData: string
@@ -103,24 +135,58 @@ export const translations: Record<Language, Translations> = {
     grossSales: 'Gross Sales',
     unitsSold: 'Units Sold',
     orders: 'Orders',
+    averageOrderValue: 'Average Order Value',
+    unitsPerOrder: 'Units per Order',
     units: 'Units',
     discounts: 'Discounts',
     productRevenueTrend: 'Product Revenue Trend',
     productTrendTitle: (metricLabel) => `${metricLabel} by product`,
     topProducts: 'Top Products',
+    productsTable: 'Products',
     storeBreakdown: 'Store Breakdown',
+    salesTrendTitle: (metricLabel) => `${metricLabel} over time`,
+    performanceTitle: (metricLabel, groupLabel) =>
+      `${metricLabel} by ${groupLabel.toLowerCase()}`,
+    productAnalysis: 'Product analysis',
+    productAnalysisDescription:
+      'Compare individual product performance when you need a deeper view.',
+    groupBy: 'Group by',
+    groupStore: 'Store',
+    groupCity: 'City',
+    groupChannel: 'Channel',
+    onlineStore: 'Online Store',
+    channelOnline: 'Online',
+    channelPhysical: 'Physical stores',
+    unknownGroup: 'Unknown',
     chat: 'Chat',
+    askSalesData: 'Ask your sales data',
     chatPlaceholder: 'Ask a question…',
     chatEmpty: 'Ask an analytics question, e.g. "Show me my top products"',
     chatThinking: 'Thinking…',
     chatSend: 'Send',
     chatError: 'Request failed. Please try again.',
     newConversation: 'New conversation',
+    chatSuggestions: [
+      'Why did sales change during this period?',
+      'Which stores are underperforming?',
+      'Compare online and physical sales.',
+      'Which products drove the result?',
+    ],
+    chatContext: (dateFrom, dateTo) => `${dateFrom} – ${dateTo}`,
+    explainWithAi: 'Explain with AI',
+    explainKpi: (metricLabel) =>
+      `Explain the change in ${metricLabel} for the current dashboard period.`,
+    explainTrend: (metricLabel) =>
+      `Analyze the ${metricLabel} trend in the current dashboard view. What stands out?`,
+    explainPerformance: (metricLabel, groupLabel) =>
+      `Analyze ${metricLabel} by ${groupLabel.toLowerCase()} in the current dashboard view. What stands out?`,
     loading: 'Loading…',
     noProducts: 'No products found.',
     colProduct: 'Product',
     colCategory: 'Category',
     sortBy: (label) => `Sort by ${label}`,
+    loadingMoreProducts: 'Loading more products…',
+    productsLoaded: (loaded, total) => `${loaded} of ${total} products`,
     grain: 'Grain',
     grainMonth: 'Month',
     grainWeek: 'Week',
@@ -131,6 +197,14 @@ export const translations: Record<Language, Translations> = {
     productsNoneSelected: 'Products (none selected)',
     noTimeseriesData: 'No timeseries data available.',
     noStoreData: 'No store breakdown data available.',
+    noPerformanceTrendData: 'No performance trend data available.',
+    view: 'View',
+    ranking: 'Ranking',
+    trend: 'Trend',
+    addComparison: 'Add comparison',
+    removeComparison: 'Remove comparison',
+    currentPeriod: 'Current period',
+    previousPeriod: 'Previous period',
     vizNoMetrics: 'No metrics available to display.',
     vizNoChartData: 'No valid data to chart.',
     vizNoRows: 'No rows to display.',
@@ -173,24 +247,58 @@ export const translations: Record<Language, Translations> = {
     grossSales: 'Bruttoomsättning',
     unitsSold: 'Sålda enheter',
     orders: 'Beställningar',
+    averageOrderValue: 'Genomsnittligt ordervärde',
+    unitsPerOrder: 'Enheter per order',
     units: 'Enheter',
     discounts: 'Rabatter',
     productRevenueTrend: 'Produktomsättningstrend',
     productTrendTitle: (metricLabel) => `${metricLabel} per produkt`,
     topProducts: 'Topprodukter',
+    productsTable: 'Produkter',
     storeBreakdown: 'Butiksfördelning',
+    salesTrendTitle: (metricLabel) => `${metricLabel} över tid`,
+    performanceTitle: (metricLabel, groupLabel) =>
+      `${metricLabel} per ${groupLabel.toLowerCase()}`,
+    productAnalysis: 'Produktanalys',
+    productAnalysisDescription:
+      'Jämför enskilda produkters utveckling när du behöver mer detaljer.',
+    groupBy: 'Gruppera efter',
+    groupStore: 'Butik',
+    groupCity: 'Stad',
+    groupChannel: 'Kanal',
+    onlineStore: 'Onlinebutik',
+    channelOnline: 'Online',
+    channelPhysical: 'Fysiska butiker',
+    unknownGroup: 'Okänd',
     chat: 'Chatt',
+    askSalesData: 'Fråga din försäljningsdata',
     chatPlaceholder: 'Ställ en fråga…',
     chatEmpty: 'Ställ en analysfråga, t.ex. "Visa mina topprodukter"',
     chatThinking: 'Tänker…',
     chatSend: 'Skicka',
     chatError: 'Förfrågan misslyckades. Försök igen.',
     newConversation: 'Ny konversation',
+    chatSuggestions: [
+      'Varför förändrades försäljningen under perioden?',
+      'Vilka butiker underpresterar?',
+      'Jämför onlineförsäljning med fysiska butiker.',
+      'Vilka produkter drev resultatet?',
+    ],
+    chatContext: (dateFrom, dateTo) => `${dateFrom} – ${dateTo}`,
+    explainWithAi: 'Förklara med AI',
+    explainKpi: (metricLabel) =>
+      `Förklara förändringen i ${metricLabel} för den aktuella perioden.`,
+    explainTrend: (metricLabel) =>
+      `Analysera trenden för ${metricLabel} i den aktuella dashboardvyn. Vad sticker ut?`,
+    explainPerformance: (metricLabel, groupLabel) =>
+      `Analysera ${metricLabel} per ${groupLabel.toLowerCase()} i den aktuella dashboardvyn. Vad sticker ut?`,
     loading: 'Laddar…',
     noProducts: 'Inga produkter hittades.',
     colProduct: 'Produkt',
     colCategory: 'Kategori',
     sortBy: (label) => `Sortera efter ${label}`,
+    loadingMoreProducts: 'Laddar fler produkter…',
+    productsLoaded: (loaded, total) => `${loaded} av ${total} produkter`,
     grain: 'Granularitet',
     grainMonth: 'Månad',
     grainWeek: 'Vecka',
@@ -201,6 +309,14 @@ export const translations: Record<Language, Translations> = {
     productsNoneSelected: 'Produkter (inga valda)',
     noTimeseriesData: 'Ingen tidsseriedata tillgänglig.',
     noStoreData: 'Ingen butiksdata tillgänglig.',
+    noPerformanceTrendData: 'Ingen trenddata för prestationen tillgänglig.',
+    view: 'Vy',
+    ranking: 'Rankning',
+    trend: 'Trend',
+    addComparison: 'Lägg till jämförelse',
+    removeComparison: 'Ta bort jämförelse',
+    currentPeriod: 'Aktuell period',
+    previousPeriod: 'Föregående period',
     vizNoMetrics: 'Inga mätvärden att visa.',
     vizNoChartData: 'Ingen giltig data att visualisera.',
     vizNoRows: 'Inga rader att visa.',

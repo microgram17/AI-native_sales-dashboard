@@ -1,3 +1,4 @@
+import ReactMarkdown from 'react-markdown'
 import type {
   VisualizationDataset,
   VisualizationSpec,
@@ -46,7 +47,23 @@ export function ChatMessage({
       >
         {content && (
           <div className="assistant-message-text">
-            {content}
+            <ReactMarkdown
+              skipHtml
+              components={{
+                a: ({ href, children }) => (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    {children}
+                  </a>
+                ),
+                img: () => null,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
           </div>
         )}
 

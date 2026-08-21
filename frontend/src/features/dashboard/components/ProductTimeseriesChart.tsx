@@ -8,11 +8,11 @@ import {
   Legend,
 } from 'recharts'
 import {
-  COLORS,
   formatShortNumber,
   formatTooltipValue,
   longToWide,
 } from './visualizationUtils'
+import { stableProductColor } from './productSeriesColor'
 import type {
   Grain,
   Metric,
@@ -20,20 +20,6 @@ import type {
   TimeseriesRow,
 } from '../../../types/dashboard'
 import { useTranslation } from '../../../i18n/LanguageContext'
-
-
-function stableColorIndex(value: string): number {
-  let hash = 0
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (
-      (hash * 31) +
-      value.charCodeAt(index)
-    ) >>> 0
-  }
-
-  return hash % COLORS.length
-}
 
 interface ProductTimeseriesChartProps {
   rows: TimeseriesRow[]
@@ -313,18 +299,11 @@ export function ProductTimeseriesChart({
                       type="monotone"
                       dataKey={series}
                       name={series}
-                      stroke={
-                        COLORS[
-                          stableColorIndex(
-                            products.find(
-                              (product) =>
-                                product.product_name ===
-                                series,
-                            )?.product_id ??
-                              series,
-                          )
-                        ]
-                      }
+                      stroke={stableProductColor(
+                        series,
+                        products,
+                        selectedProductIds,
+                      )}
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4 }}

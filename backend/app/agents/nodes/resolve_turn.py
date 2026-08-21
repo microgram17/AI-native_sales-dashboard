@@ -10,11 +10,14 @@ from google.adk.agents.context import Context
 from google.adk.workflow import BaseNode, node
 
 from app.agents.request_state import (
+    apply_dashboard_context,
     build_new_request,
+    coerce_dashboard_context,
     coerce_interpretation,
     coerce_request,
     effective_mode,
     merge_request,
+    references_dashboard_context,
     request_to_json,
     validate_request,
 )
@@ -53,9 +56,30 @@ def build_resolve_turn_node() -> BaseNode:
         user_message: str = "",
         current_date: str = "",
         ui_language: str = "en",
+        widget_analysis_request_json: Any = "null",
+        dashboard_context_json: Any = "null",
     ) -> None:
         interpretation = coerce_interpretation(turn_interpretation)
         previous = coerce_request(canonical_request_json)
+        widget_request = coerce_request(widget_analysis_request_json)
+        dashboard_context = coerce_dashboard_context(dashboard_context_json)
+
+        if widget_request is not None:
+            error = validate_request(widget_request)
+            if error is not None:
+                ctx.state[StateKeys.DIRECT_MESSAGE] = _localized_message(
+                    ui_language,
+                    "invalid",
+                )
+                ctx.route = ROUTE_DIRECT
+                return
+
+            ctx.state[StateKeys.EFFECTIVE_MODE] = "new_analysis"
+            ctx.state[StateKeys.CANONICAL_REQUEST_JSON] = request_to_json(
+                widget_request
+            )
+            ctx.route = ROUTE_EXECUTE
+            return
 
         try:
             today = date.fromisoformat(current_date)
@@ -77,29 +101,48 @@ def build_resolve_turn_node() -> BaseNode:
 
         if mode in {"visualize_existing", "analyze_existing"}:
             if previous is None or not last_has_results:
-                ctx.state[StateKeys.DIRECT_MESSAGE] = _localized_message(
-                    ui_language,
-                    "no_prior",
-                )
-                ctx.route = ROUTE_DIRECT
-                return
+                if (
+                    dashboard_context is not None
+                    and references_dashboard_context(user_message)
+                ):
+                    interpretation_requested = mode == "analyze_existing"
+                    mode = "new_analysis"
+                    ctx.state[StateKeys.EFFECTIVE_MODE] = mode
+                    interpretation = interpretation.model_copy(
+                        update={
+                            "mode": "new_analysis",
+                            "operation": dashboard_context.view or "summary",
+                            "interpretation_requested": (
+                                interpretation_requested
+                                or interpretation.interpretation_requested
+                            ),
+                        }
+                    )
+                else:
+                    ctx.state[StateKeys.DIRECT_MESSAGE] = _localized_message(
+                        ui_language,
+                        "no_prior",
+                    )
+                    ctx.route = ROUTE_DIRECT
+                    return
 
-            request = previous.model_copy(
-                update={
-                    "presentation": (
-                        interpretation.presentation
-                        or (
-                            "chart"
-                            if mode == "visualize_existing"
-                            else previous.presentation
-                        )
-                    ),
-                    "interpretation_requested": mode == "analyze_existing",
-                }
-            )
-            ctx.state[StateKeys.CANONICAL_REQUEST_JSON] = request_to_json(request)
-            ctx.route = ROUTE_REUSE
-            return
+            else:
+                request = previous.model_copy(
+                    update={
+                        "presentation": (
+                            interpretation.presentation
+                            or (
+                                "chart"
+                                if mode == "visualize_existing"
+                                else previous.presentation
+                            )
+                        ),
+                        "interpretation_requested": mode == "analyze_existing",
+                    }
+                )
+                ctx.state[StateKeys.CANONICAL_REQUEST_JSON] = request_to_json(request)
+                ctx.route = ROUTE_REUSE
+                return
 
         if mode == "modify_analysis" and previous is not None:
             request = merge_request(
@@ -114,6 +157,12 @@ def build_resolve_turn_node() -> BaseNode:
                 user_message=user_message,
                 current_date=today,
             )
+
+        request = apply_dashboard_context(
+            request,
+            dashboard_context,
+            user_message=user_message,
+        )
 
         error = validate_request(request)
         if error == "product_overview requires a product":
