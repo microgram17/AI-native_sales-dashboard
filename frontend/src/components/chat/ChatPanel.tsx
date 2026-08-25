@@ -1,162 +1,233 @@
-import { useState, useRef, useEffect } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useMutation } from '@tanstack/react-query'
-import type { DashboardArtifact } from '../../types/dashboard'
-import { sendChatMessage } from '../../api/chat'
+import type {
+  ChatEntry,
+  DashboardChatContext,
+  WidgetAnalysisRequest,
+} from '../../types/agent'
+import { queryAgent } from '../../api/agent'
 import { ChatMessage } from './ChatMessage'
 import { useTranslation } from '../../i18n/LanguageContext'
 
-interface ChatEntry {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  artifacts?: DashboardArtifact[]
+export interface ChatPromptRequest {
+  id: number
+  text: string
+  widgetAnalysis: WidgetAnalysisRequest
 }
 
-export function ChatPanel() {
-  const { t } = useTranslation()
-  const [messages, setMessages] = useState<ChatEntry[]>([])
+interface ChatPanelProps {
+  dashboardContext?: DashboardChatContext
+  contextLabel?: string
+  requestedPrompt?: ChatPromptRequest | null
+}
+
+export function ChatPanel({
+  dashboardContext,
+  contextLabel,
+  requestedPrompt,
+}: ChatPanelProps = {}) {
+  const { t, language } = useTranslation()
+  const [messages, setMessages] =
+    useState<ChatEntry[]>([])
   const [input, setInput] = useState('')
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [
+    conversationId,
+    setConversationId,
+  ] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const lastRequestedPromptId = useRef<number | null>(null)
 
   const mutation = useMutation({
-    mutationFn: sendChatMessage,
+    mutationFn: queryAgent,
     onSuccess: (data) => {
-      setSessionId(data.session_id)
-      setMessages((prev) => [
-        ...prev,
+      setConversationId(data.conversation_id)
+      setMessages((previous) => [
+        ...previous,
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: data.assistant_message,
-          artifacts: data.artifacts,
+          content: data.message,
+          displays: data.displays,
+          dataViews: data.data_views,
+          dataContext: data.data_context,
+          toolCalls: data.tool_calls,
         },
       ])
     },
   })
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+    })
   }, [messages])
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  useEffect(() => {
+    if (
+      !requestedPrompt?.text ||
+      mutation.isPending ||
+      lastRequestedPromptId.current === requestedPrompt.id
+    ) {
+      return
+    }
+
+    lastRequestedPromptId.current = requestedPrompt.id
+    const text = requestedPrompt.text.trim()
+    setInput('')
+    setConversationId(null)
+    setMessages([
+      {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: text,
+      },
+    ])
+    mutation.reset()
+    mutation.mutate({
+      message: text,
+      conversation_id: null,
+      language,
+      dashboard_context: dashboardContext,
+      widget_analysis: requestedPrompt.widgetAnalysis,
+    })
+  }, [
+    dashboardContext,
+    language,
+    mutation,
+    requestedPrompt,
+  ])
+
+  function handleSubmit(
+    event: React.FormEvent,
+  ) {
+    event.preventDefault()
+
     const text = input.trim()
     if (!text || mutation.isPending) return
+
     setInput('')
-    setMessages((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), role: 'user', content: text },
+    setMessages((previous) => [
+      ...previous,
+      {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: text,
+      },
     ])
-    mutation.mutate({ session_id: sessionId, message: text })
+
+    mutation.mutate({
+      message: text,
+      conversation_id: conversationId,
+      language,
+      dashboard_context: dashboardContext,
+    })
+  }
+
+  function handleNewConversation() {
+    if (mutation.isPending) return
+
+    setMessages([])
+    setConversationId(null)
+    mutation.reset()
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '560px' }}>
-      {/* Message list */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '1rem',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
+    <div className="dashboard-chat">
+      <div className="dashboard-chat-toolbar">
+        {contextLabel && (
+          <span className="dashboard-chat-context">{contextLabel}</span>
+        )}
+        <button
+          type="button"
+          onClick={handleNewConversation}
+          disabled={
+            mutation.isPending ||
+            messages.length === 0
+          }
+        >
+          {t.newConversation}
+        </button>
+      </div>
+
+      <div className="dashboard-chat-messages">
         {messages.length === 0 && (
-          <div
-            style={{
-              textAlign: 'center',
-              color: 'var(--muted)',
-              fontSize: '0.875rem',
-              marginTop: '2rem',
-            }}
-          >
-            {t.chatEmpty}
+          <div className="dashboard-chat-empty">
+            <p>{t.chatEmpty}</p>
+            <div className="dashboard-chat-suggestions">
+              {t.chatSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setInput(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        {messages.map((msg) => (
+
+        {messages.map((message) => (
           <ChatMessage
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            artifacts={msg.artifacts}
+            key={message.id}
+            role={message.role}
+            content={message.content}
+            displays={message.displays}
+            dataViews={message.dataViews}
+            dataContext={message.dataContext}
+            toolCalls={message.toolCalls}
           />
         ))}
+
         {mutation.isPending && (
-          <div
-            style={{
-              color: 'var(--muted)',
-              fontSize: '0.8rem',
-              fontStyle: 'italic',
-              marginBottom: '0.5rem',
-              alignSelf: 'flex-start',
-            }}
-          >
+          <div className="dashboard-chat-thinking">
             {t.chatThinking}
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
 
-      {/* Error banner */}
       {mutation.isError && (
         <div
-          style={{
-            padding: '0.5rem 1rem',
-            fontSize: '0.8rem',
-            color: '#f87171',
-            background: 'rgba(248,113,113,0.08)',
-            borderTop: '1px solid rgba(248,113,113,0.2)',
-          }}
+          role="alert"
+          className="dashboard-chat-error"
         >
-          {mutation.error instanceof Error ? mutation.error.message : t.chatError}
+          {mutation.error instanceof Error
+            ? mutation.error.message
+            : t.chatError}
         </div>
       )}
 
-      {/* Input bar */}
       <form
         onSubmit={handleSubmit}
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          padding: '0.75rem 1rem',
-          borderTop: '1px solid var(--border, #334155)',
-        }}
+        className="dashboard-chat-input"
       >
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(event) =>
+            setInput(event.target.value)
+          }
           placeholder={t.chatPlaceholder}
           disabled={mutation.isPending}
-          style={{
-            flex: 1,
-            padding: '0.5rem 0.75rem',
-            borderRadius: '6px',
-            border: '1px solid var(--border, #334155)',
-            background: 'var(--surface, #1e293b)',
-            color: 'inherit',
-            fontSize: '0.875rem',
-            outline: 'none',
-          }}
         />
+
         <button
           type="submit"
-          disabled={mutation.isPending || !input.trim()}
-          style={{
-            padding: '0.5rem 1.125rem',
-            borderRadius: '6px',
-            border: 'none',
-            background: 'var(--accent, #6366f1)',
-            color: '#fff',
-            fontSize: '0.875rem',
-            cursor: mutation.isPending || !input.trim() ? 'not-allowed' : 'pointer',
-            opacity: mutation.isPending || !input.trim() ? 0.55 : 1,
-            transition: 'opacity 0.15s',
-          }}
+          disabled={
+            mutation.isPending ||
+            !input.trim()
+          }
         >
-          {mutation.isPending ? '…' : t.chatSend}
+          {mutation.isPending
+            ? '…'
+            : t.chatSend}
         </button>
       </form>
     </div>

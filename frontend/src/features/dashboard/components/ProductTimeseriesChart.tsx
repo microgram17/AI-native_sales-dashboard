@@ -8,12 +8,17 @@ import {
   Legend,
 } from 'recharts'
 import {
-  COLORS,
   formatShortNumber,
   formatTooltipValue,
   longToWide,
 } from './visualizationUtils'
-import type { Grain, Metric, ProductSelectorItem, TimeseriesRow } from '../../../types/dashboard'
+import { stableProductColor } from './productSeriesColor'
+import type {
+  Grain,
+  Metric,
+  ProductSelectorItem,
+  TimeseriesRow,
+} from '../../../types/dashboard'
 import { useTranslation } from '../../../i18n/LanguageContext'
 
 interface ProductTimeseriesChartProps {
@@ -23,8 +28,8 @@ interface ProductTimeseriesChartProps {
   metric: Metric
   selectedProductIds: string[]
   products: ProductSelectorItem[]
-  onGrainChange: (g: Grain) => void
-  onMetricChange: (m: Metric) => void
+  onGrainChange: (grain: Grain) => void
+  onMetricChange: (metric: Metric) => void
   onProductsChange: (ids: string[]) => void
 }
 
@@ -38,7 +43,8 @@ export function ProductTimeseriesChart({
   onGrainChange,
   onMetricChange,
   onProductsChange,
-}: ProductTimeseriesChartProps) {  const { t } = useTranslation()
+}: ProductTimeseriesChartProps) {
+  const { t } = useTranslation()
 
   const metricLabels: Record<Metric, string> = {
     net_sales: t.netSales,
@@ -47,121 +53,132 @@ export function ProductTimeseriesChart({
     orders: t.orders,
     discounts: t.discounts,
   }
+
   function toggleProduct(id: string) {
     if (selectedProductIds.includes(id)) {
-      onProductsChange(selectedProductIds.filter((p) => p !== id))
-    } else {
-      onProductsChange([...selectedProductIds, id])
+      onProductsChange(
+        selectedProductIds.filter(
+          (productId) => productId !== id,
+        ),
+      )
+      return
     }
+
+    onProductsChange([
+      ...selectedProductIds,
+      id,
+    ])
   }
 
   return (
-    <div>
-      {/* Controls */}
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
-        {/* Grain toggle */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>{t.grain}</span>
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {(['month', 'week'] as Grain[]).map((g) => (
-              <button
-                key={g}
-                onClick={() => onGrainChange(g)}
-                style={{
-                  padding: '0.25rem 0.625rem',
-                  fontSize: '0.8125rem',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border, #334155)',
-                  background: grain === g ? 'var(--accent)' : 'transparent',
-                  color: grain === g ? '#fff' : 'inherit',
-                  cursor: 'pointer',
-                }}
-              >
-                {g === 'month' ? t.grainMonth : t.grainWeek}
-              </button>
-            ))}
+    <div className="product-timeseries">
+      <div className="product-timeseries-controls">
+        <div className="dashboard-control">
+          <span className="dashboard-control-label">
+            {t.grain}
+          </span>
+
+          <div className="grain-toggle">
+            {(['month', 'week'] as Grain[]).map(
+              (item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() =>
+                    onGrainChange(item)
+                  }
+                  className={
+                    grain === item ? 'active' : ''
+                  }
+                >
+                  {item === 'month'
+                    ? t.grainMonth
+                    : t.grainWeek}
+                </button>
+              ),
+            )}
           </div>
         </div>
 
-        {/* Metric selector */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>{t.metric}</span>
-          <select
-            value={metric}
-            onChange={(e) => onMetricChange(e.target.value as Metric)}
-            style={{
-              padding: '0.25rem 0.5rem',
-              fontSize: '0.8125rem',
-              borderRadius: '4px',
-              border: '1px solid var(--border, #334155)',
-              background: 'var(--surface, #1e293b)',
-              color: 'inherit',
-              cursor: 'pointer',
-            }}
+        <div className="dashboard-control">
+          <label
+            className="dashboard-control-label"
+            htmlFor="product-trend-metric"
           >
-            {(Object.entries(metricLabels) as [Metric, string][]).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
+            {t.metric}
+          </label>
+
+          <select
+            id="product-trend-metric"
+            value={metric}
+            onChange={(event) =>
+              onMetricChange(
+                event.target.value as Metric,
+              )
+            }
+            className="dashboard-select"
+          >
+            {(
+              Object.entries(metricLabels) as [
+                Metric,
+                string,
+              ][]
+            ).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
             ))}
           </select>
         </div>
 
-        {/* Product selector */}
         {products.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minWidth: '160px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 }}>
-                {selectedProductIds.length > 0 ? t.productsSelected(selectedProductIds.length) : t.productsTop5}
+          <div className="dashboard-control product-selector-control">
+            <div className="product-selector-heading">
+              <span className="dashboard-control-label">
+                {selectedProductIds.length > 0
+                  ? t.productsSelected(
+                      selectedProductIds.length,
+                    )
+                  : t.productsNoneSelected}
               </span>
+
               {selectedProductIds.length > 0 && (
                 <button
-                  onClick={() => onProductsChange([])}
-                  style={{
-                    fontSize: '0.7rem',
-                    padding: '0.1rem 0.375rem',
-                    borderRadius: '4px',
-                    border: '1px solid var(--border, #334155)',
-                    background: 'transparent',
-                    color: 'var(--muted)',
-                    cursor: 'pointer',
-                  }}
+                  type="button"
+                  onClick={() =>
+                    onProductsChange([])
+                  }
+                  className="clear-selection-button"
                 >
                   {t.clearSelection}
                 </button>
               )}
             </div>
-            <div
-              style={{
-                maxHeight: '120px',
-                overflowY: 'auto',
-                border: '1px solid var(--border, #334155)',
-                borderRadius: '4px',
-                padding: '0.25rem',
-              }}
-            >
-              {products.map((p) => (
+
+            <div className="product-selector-list">
+              {products.map((product) => (
                 <label
-                  key={p.product_id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.375rem',
-                    padding: '0.125rem 0.25rem',
-                    fontSize: '0.8125rem',
-                    cursor: 'pointer',
-                    borderRadius: '3px',
-                  }}
+                  key={product.product_id}
+                  className="product-selector-item"
                 >
                   <input
                     type="checkbox"
-                    checked={selectedProductIds.includes(p.product_id)}
-                    onChange={() => toggleProduct(p.product_id)}
-                    style={{ cursor: 'pointer' }}
+                    checked={selectedProductIds.includes(
+                      product.product_id,
+                    )}
+                    onChange={() =>
+                      toggleProduct(
+                        product.product_id,
+                      )
+                    }
                   />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.product_name}
+
+                  <span className="product-selector-name">
+                    {product.product_name}
                   </span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)', flexShrink: 0 }}>
-                    {p.category}
+
+                  <span className="product-selector-category">
+                    {product.category}
                   </span>
                 </label>
               ))}
@@ -170,41 +187,134 @@ export function ProductTimeseriesChart({
         )}
       </div>
 
-      {/* Chart */}
       {loading ? (
-        <div className="chart-placeholder">{t.loading}</div>
+        <div className="chart-placeholder">
+          {t.loading}
+        </div>
       ) : !rows.length ? (
-        <div className="chart-placeholder">{t.noTimeseriesData}</div>
-      ) : (() => {
-        const { wideData, seriesValues } = longToWide(rows as unknown as Record<string, unknown>[], 'period', 'product_name', 'value')
-        if (!wideData.length) return <div className="chart-placeholder">{t.noTimeseriesData}</div>
-        return (
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={wideData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-              <XAxis dataKey="period" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-              <YAxis
-                tick={{ fontSize: 11 }}
-                tickFormatter={(v: number) => formatShortNumber(v)}
-                width={44}
-              />
-              <Tooltip formatter={(v) => formatTooltipValue(v)} />
-              {seriesValues.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
-              {seriesValues.map((series, i) => (
-                <Line
-                  key={series}
-                  type="monotone"
-                  dataKey={series}
-                  name={series}
-                  stroke={COLORS[i % COLORS.length]}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
+        <div className="chart-placeholder">
+          {t.noTimeseriesData}
+        </div>
+      ) : (
+        (() => {
+          const {
+            wideData,
+            seriesValues,
+          } = longToWide(
+            rows as unknown as Record<
+              string,
+              unknown
+            >[],
+            'period',
+            'product_name',
+            'value',
+          )
+
+          if (!wideData.length) {
+            return (
+              <div className="chart-placeholder">
+                {t.noTimeseriesData}
+              </div>
+            )
+          }
+
+          return (
+            <ResponsiveContainer
+              width="100%"
+              height={250}
+            >
+              <LineChart
+                data={wideData}
+                margin={{
+                  top: 8,
+                  right: 18,
+                  left: 0,
+                  bottom: 4,
+                }}
+              >
+                <XAxis
+                  dataKey="period"
+                  tick={{
+                    fontSize: 11,
+                    fill: 'var(--viz-axis)',
+                  }}
+                  axisLine={{
+                    stroke:
+                      'var(--viz-axis-line)',
+                  }}
+                  tickLine={{
+                    stroke:
+                      'var(--viz-axis-line)',
+                  }}
+                  interval="preserveStartEnd"
                 />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        )
-      })()}
+
+                <YAxis
+                  tick={{
+                    fontSize: 11,
+                    fill: 'var(--viz-axis)',
+                  }}
+                  axisLine={{
+                    stroke:
+                      'var(--viz-axis-line)',
+                  }}
+                  tickLine={{
+                    stroke:
+                      'var(--viz-axis-line)',
+                  }}
+                  tickFormatter={(
+                    value: number,
+                  ) =>
+                    formatShortNumber(value)
+                  }
+                  width={46}
+                />
+
+                <Tooltip
+                  formatter={(value) =>
+                    formatTooltipValue(value)
+                  }
+                  contentStyle={{
+                    background:
+                      'var(--viz-tooltip-bg)',
+                    border:
+                      '1px solid var(--viz-tooltip-border)',
+                    borderRadius: '8px',
+                    color: 'var(--text-h)',
+                  }}
+                />
+
+                {seriesValues.length > 1 && (
+                  <Legend
+                    wrapperStyle={{
+                      fontSize: 11,
+                    }}
+                  />
+                )}
+
+                {seriesValues.map(
+                  (series) => (
+                    <Line
+                      key={series}
+                      type="monotone"
+                      dataKey={series}
+                      name={series}
+                      stroke={stableProductColor(
+                        series,
+                        products,
+                        selectedProductIds,
+                      )}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  ),
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          )
+        })()
+      )}
     </div>
   )
 }

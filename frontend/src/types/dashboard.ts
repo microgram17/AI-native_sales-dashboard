@@ -1,42 +1,13 @@
-export interface DashboardUser {
-  user_id: string
-  display_name: string
-  supplier_id: string
-}
+export type Metric =
+  | 'net_sales'
+  | 'gross_sales'
+  | 'units'
+  | 'orders'
+  | 'discounts'
 
-export interface KpiCardData {
-  key: string
-  label: string
-  value: number
-  unit: string | null
-}
-
-export interface DashboardArtifact {
-  source_tool: string
-  result_type: string
-  title: string
-  description?: string
-  columns: Array<Record<string, unknown>>
-  rows: Array<Record<string, unknown>>
-  recommended_visualizations?: Array<Record<string, unknown>>
-  data_quality?: Record<string, unknown>
-  primary_metric?: string
-  dimension?: string
-  result_intent?: string
-}
-
-export interface DashboardResponse {
-  user: DashboardUser
-  cards: KpiCardData[]
-  artifacts: DashboardArtifact[]
-}
-
-// --- Shared types ---
-
-export type Metric = 'net_sales' | 'gross_sales' | 'units' | 'orders' | 'discounts'
 export type Grain = 'week' | 'month'
-
-// --- Widget endpoint response types ---
+export type StoreGroupBy = 'store' | 'city' | 'channel'
+export type ProductSortDirection = 'asc' | 'desc'
 
 export interface SummaryResponse {
   date_from: string | null
@@ -65,6 +36,19 @@ export interface ProductTimeseriesResponse {
   rows: TimeseriesRow[]
 }
 
+export interface SalesTimeseriesRow {
+  period: string
+  value: number
+}
+
+export interface SalesTimeseriesResponse {
+  date_from: string | null
+  date_to: string | null
+  grain: Grain
+  metric: Metric
+  rows: SalesTimeseriesRow[]
+}
+
 export interface TopProductsRow {
   rank: number
   product_id: string
@@ -85,6 +69,17 @@ export interface TopProductsResponse {
   rows: TopProductsRow[]
 }
 
+export interface ProductTableResponse {
+  date_from: string | null
+  date_to: string | null
+  sort_by: Metric
+  sort_direction: ProductSortDirection
+  offset: number
+  limit: number
+  total: number
+  rows: TopProductsRow[]
+}
+
 export interface ProductSelectorItem {
   product_id: string
   product_name: string
@@ -98,3 +93,36 @@ export interface ProductsResponse {
   date_to: string | null
   products: ProductSelectorItem[]
 }
+
+export interface StoreBreakdownRow {
+  group_id: string
+  group_name: string
+  value: number
+}
+
+export interface StoreBreakdownResponse {
+  date_from: string | null
+  date_to: string | null
+  metric: Metric
+  group_by: StoreGroupBy
+  rows: StoreBreakdownRow[]
+}
+
+export interface PerformanceTimeseriesRow {
+  period: string
+  group_id: string
+  group_name: string
+  value: number
+}
+
+export interface PerformanceTimeseriesResponse {
+  date_from: string | null
+  date_to: string | null
+  grain: Grain
+  metric: Metric
+  group_by: StoreGroupBy
+  limit_groups: number
+  rows: PerformanceTimeseriesRow[]
+}
+
+export type PerformanceView = 'ranking' | 'trend'

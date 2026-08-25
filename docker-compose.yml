@@ -22,7 +22,11 @@ services:
     volumes:
       - ./backend/app:/app/app
     environment:
-      - MCP_SERVER_URL=http://mcp_server:8000/mcp/
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/retail_bi
+      - MCP_SERVER_URL=http://mcp_server:8000/mcp
+      - MCP_JWT_SECRET=dev-mcp-shared-secret-change-me-please
+      - MCP_JWT_ISSUER=retail-bi-backend
+      - MCP_JWT_AUDIENCE=retail-bi-mcp
     depends_on:
       - mcp_server
       - postgres
@@ -34,9 +38,11 @@ services:
       - "8001:8000"
     volumes:
       - ./mcp_server/app:/app/app
-      - ./mcp_server/scripts:/app/scripts
     environment:
       - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/retail_bi
+      - MCP_JWT_SECRET=dev-mcp-shared-secret-change-me-please
+      - MCP_JWT_ISSUER=retail-bi-backend
+      - MCP_JWT_AUDIENCE=retail-bi-mcp
     depends_on:
       - postgres
 
