@@ -20,7 +20,6 @@ import {
 } from '../../lib/datasetResolver'
 import {
   COLORS,
-  formatShortNumber,
 } from '../../features/dashboard/components/visualizationUtils'
 import { formatMetricValue } from '../../lib/format'
 import { useTranslation } from '../../i18n/LanguageContext'
@@ -69,6 +68,11 @@ export function BarChartVisualization({
 
     return item
   })
+  const primaryFormat = dataset.fields.find(
+    (field) => field.key === valueKeys[0],
+  )?.format
+  const formatTick = (value: unknown) =>
+    formatMetricValue(valueKeys[0], value, primaryFormat)
 
   const longestLabel = Math.max(
     ...data.map((item) =>
@@ -105,7 +109,7 @@ export function BarChartVisualization({
           <>
             <XAxis
               type="number"
-              tickFormatter={formatShortNumber}
+              tickFormatter={formatTick}
               tick={{
                 fontSize: 11,
                 fill: 'var(--viz-axis)',
@@ -154,7 +158,7 @@ export function BarChartVisualization({
               height={50}
             />
             <YAxis
-              tickFormatter={formatShortNumber}
+              tickFormatter={formatTick}
               tick={{
                 fontSize: 11,
                 fill: 'var(--viz-axis)',
@@ -171,7 +175,11 @@ export function BarChartVisualization({
 
         <Tooltip
           formatter={(value, name) => [
-            formatMetricValue(String(name), value),
+            formatMetricValue(
+              String(name),
+              value,
+              dataset.fields.find((field) => field.key === String(name))?.format,
+            ),
             visualizationFieldLabel(language, String(name)),
           ]}
           contentStyle={{

@@ -1,296 +1,147 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { VisualizationRenderer } from './VisualizationRenderer'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { LanguageProvider } from '../../i18n/LanguageContext'
-import type {
-  VisualizationDataset,
-  VisualizationSpec,
-} from '../../types/agent'
+import type { DataView, DisplaySelection } from '../../types/agent'
+import { VisualizationRenderer } from './VisualizationRenderer'
 
 afterEach(cleanup)
 
+const ranking: DataView = {
+  id: 'ranking',
+  kind: 'categorical',
+  rows: [
+    { entity_name: 'Hoodie', units: 40, net_sales: 1000 },
+    { entity_name: 'Tee', units: 30, net_sales: 800 },
+  ],
+  fields: [
+    { key: 'entity_name', role: 'dimension', format: 'text' },
+    { key: 'units', role: 'measure', format: 'integer' },
+    { key: 'net_sales', role: 'measure', format: 'currency_sek' },
+  ],
+  primary_dimension: 'entity_name',
+  default_measures: ['units'],
+  default_visible: true,
+}
 
-function renderVisualization(
-  visualizations: VisualizationSpec[],
-  datasets: VisualizationDataset[],
-) {
+const trend: DataView = {
+  id: 'trend',
+  kind: 'timeseries',
+  rows: [
+    { period_label: '2026-01', net_sales: 1000 },
+    { period_label: '2026-02', net_sales: 1200 },
+  ],
+  fields: [
+    { key: 'period_label', role: 'dimension', format: 'text' },
+    { key: 'net_sales', role: 'measure', format: 'currency_sek' },
+  ],
+  primary_dimension: 'period_label',
+  default_measures: ['net_sales'],
+  default_visible: true,
+}
+
+function renderView(display: DisplaySelection, view: DataView) {
   return render(
     <LanguageProvider>
-      <VisualizationRenderer
-        visualizations={visualizations}
-        datasets={datasets}
-      />
+      <VisualizationRenderer displays={[display]} dataViews={[view]} />
     </LanguageProvider>,
   )
 }
 
-const rankDataset: VisualizationDataset = {
-  id: 'c1:ranking',
-  source_call_id: 'c1',
-  view: 'ranking',
-  rows: [
-    {
-      rank: 1,
-      entity_name: 'Hoodie',
-      units: 40,
-      net_sales: 1000,
-      orders: 30,
-    },
-    {
-      rank: 2,
-      entity_name: 'Tee',
-      units: 30,
-      net_sales: 800,
-      orders: 22,
-    },
-  ],
-}
-
-const trendDataset: VisualizationDataset = {
-  id: 'c2:trend',
-  source_call_id: 'c2',
-  view: 'trend',
-  rows: [
-    {
-      period_label: '2026-01',
-      units: 1114,
-      net_sales: 577975.25,
-      gross_sales: 630535.60,
-      orders: 844,
-    },
-    {
-      period_label: '2026-02',
-      units: 923,
-      net_sales: 534170.10,
-      gross_sales: 544169.03,
-      orders: 698,
-    },
-  ],
-}
-
-function spec(
-  partial: Partial<VisualizationSpec> &
-    Pick<VisualizationSpec, 'type' | 'title' | 'dataset'>,
-): VisualizationSpec {
-  return {
-    y_keys: [],
-    secondary_y_keys: [],
-    columns: [],
-    ...partial,
-  }
-}
-
 describe('VisualizationRenderer', () => {
-  it('renders metric_cards', () => {
-    renderVisualization(
-      [
-          spec({
-            type: 'metric_cards',
-            title: 'KPIs',
-            dataset: 'c1:ranking',
-            y_keys: ['units', 'net_sales'],
-          }),
-        ],
-      [rankDataset],
+  it('renders all default metrics for a one-item ranking', () => {
+    const singleRanking: DataView = {
+      ...ranking,
+      kind: 'metrics',
+      rows: [ranking.rows[0]],
+      default_measures: ['units', 'net_sales'],
+    }
+    const { container } = renderView(
+      {
+        view_id: 'ranking',
+        render_as: 'default',
+        measure_keys: ['units', 'net_sales'],
+        title: 'Best product',
+      },
+      singleRanking,
     )
 
-    expect(
-      screen.getByText('KPIs'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Sålda enheter')).toBeInTheDocument()
-    expect(screen.getByText('Nettoomsättning')).toBeInTheDocument()
+    expect(screen.getByText('Best product')).toBeInTheDocument()
+    expect(screen.getByText('Hoodie')).toBeInTheDocument()
+    expect(container.querySelectorAll('.visualization-metric-card')).toHaveLength(2)
   })
 
-  it('renders bar_chart title', () => {
-    renderVisualization(
-      [
-          spec({
-            type: 'bar_chart',
-            title: 'Top products',
-            dataset: 'c1:ranking',
-            x_key: 'entity_name',
-            y_keys: ['units'],
-          }),
-        ],
-      [rankDataset],
+  it('maps categorical views to a bar chart', () => {
+    renderView(
+      {
+        view_id: 'ranking',
+        render_as: 'default',
+        measure_keys: ['units'],
+        title: 'Top products',
+      },
+      ranking,
     )
-
-    expect(
-      screen.getByText('Top products'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Top products')).toBeInTheDocument()
+    expect(screen.queryByText('No valid data to chart.')).not.toBeInTheDocument()
   })
 
-  it('renders a single-axis line_chart', () => {
-    renderVisualization(
-      [
-          spec({
-            type: 'line_chart',
-            title: 'Monthly sales',
-            dataset: 'c2:trend',
-            x_key: 'period_label',
-            y_keys: ['net_sales'],
-          }),
-        ],
-      [trendDataset],
+  it('maps timeseries views to a line chart', () => {
+    renderView(
+      {
+        view_id: 'trend',
+        render_as: 'default',
+        measure_keys: ['net_sales'],
+        title: 'Monthly sales',
+      },
+      trend,
     )
-
-    expect(
-      screen.getByText('Monthly sales'),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByText('No valid data to chart.'),
-    ).not.toBeInTheDocument()
+    expect(screen.getByText('Monthly sales')).toBeInTheDocument()
   })
 
-  it('renders a dual-axis line_chart', () => {
-    renderVisualization(
-      [
-          spec({
-            type: 'line_chart',
-            title: 'Monthly units and net sales',
-            dataset: 'c2:trend',
-            x_key: 'period_label',
-            y_keys: ['units', 'net_sales'],
-            secondary_y_keys: ['net_sales'],
-          }),
-        ],
-      [trendDataset],
+  it('honors a table presentation override', () => {
+    renderView(
+      {
+        view_id: 'ranking',
+        render_as: 'table',
+        measure_keys: ['units'],
+        title: 'Ranking table',
+      },
+      ranking,
     )
-
-    expect(
-      screen.getByText('Monthly units and net sales'),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByText('No valid data to chart.'),
-    ).not.toBeInTheDocument()
+    expect(screen.getByText('Ranking table')).toBeInTheDocument()
+    expect(screen.getByText('Hoodie')).toBeInTheDocument()
+    expect(screen.getByText('Tee')).toBeInTheDocument()
   })
 
-  it('renders table with explicit columns', () => {
-    renderVisualization(
-      [
-          spec({
-            type: 'table',
-            title: 'Ranking',
-            dataset: 'c1:ranking',
-            columns: [
-              'rank',
-              'entity_name',
-              'units',
-            ],
-          }),
-        ],
-      [rankDataset],
+  it('ignores a display that references a missing view', () => {
+    const { container } = render(
+      <LanguageProvider>
+        <VisualizationRenderer
+          displays={[{
+            view_id: 'missing',
+            render_as: 'default',
+            measure_keys: ['units'],
+          }]}
+          dataViews={[ranking]}
+        />
+      </LanguageProvider>,
     )
-
-    expect(
-      screen.getByText('Ranking'),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText('Hoodie'),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText('Tee'),
-    ).toBeInTheDocument()
+    expect(container.querySelector('.visualization-card')).toBeNull()
   })
 
-  it('does not silently fall back to another dataset', () => {
-    renderVisualization(
-      [
-          spec({
-            type: 'bar_chart',
-            title: 'Broken',
-            dataset: 'does-not-exist',
-            x_key: 'entity_name',
-            y_keys: ['units'],
-          }),
-        ],
-      [rankDataset],
+  it('falls back to a table for an unknown runtime shape', () => {
+    const unknown = {
+      ...ranking,
+      kind: 'future-shape',
+    } as unknown as DataView
+    renderView(
+      {
+        view_id: 'ranking',
+        render_as: 'default',
+        measure_keys: ['units'],
+        title: 'Future view',
+      },
+      unknown,
     )
-
-    expect(
-      screen.getByText('Broken'),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/No visualization dataset/),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Hoodie')).toBeInTheDocument()
   })
-
-  it('preserves an originally requested multi-metric chart as a selector option', () => {
-    renderVisualization(
-      [
-        spec({
-          type: 'line_chart',
-          title: 'Utveckling – 2026',
-          dataset: 'c2:trend',
-          x_key: 'period_label',
-          y_keys: ['units', 'net_sales'],
-          secondary_y_keys: ['net_sales'],
-          selectable_y_keys: [
-            'net_sales',
-            'units',
-          ],
-        }),
-      ],
-      [trendDataset],
-    )
-
-    const selector = screen.getByRole('combobox')
-
-    expect(selector).toHaveValue('__requested_metrics__')
-    expect(
-      screen.getByRole('option', {
-        name: 'Sålda enheter + Nettoomsättning',
-      }),
-    ).toBeInTheDocument()
-
-    fireEvent.change(selector, {
-      target: { value: 'units' },
-    })
-    expect(selector).toHaveValue('units')
-
-    fireEvent.change(selector, {
-      target: { value: '__requested_metrics__' },
-    })
-    expect(selector).toHaveValue('__requested_metrics__')
-  })
-
-  it('lets the user switch an interactive line-chart metric locally', () => {
-    renderVisualization(
-      [
-        spec({
-          type: 'line_chart',
-          title: 'Utveckling för Windbreaker Jacket – Q1 2026',
-          dataset: 'c2:trend',
-          x_key: 'period_label',
-          y_keys: ['net_sales'],
-          selectable_y_keys: [
-            'net_sales',
-            'gross_sales',
-            'units',
-            'orders',
-          ],
-        }),
-      ],
-      [trendDataset],
-    )
-
-    const selector = screen.getByRole('combobox')
-    expect(selector).toHaveValue('net_sales')
-    expect(
-      screen.getByRole('option', { name: 'Nettoomsättning' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('option', { name: 'Sålda enheter' }),
-    ).toBeInTheDocument()
-
-    fireEvent.change(selector, {
-      target: { value: 'units' },
-    })
-
-    expect(selector).toHaveValue('units')
-    expect(
-      screen.getByText('Utveckling för Windbreaker Jacket – Q1 2026'),
-    ).toBeInTheDocument()
-  })
-
 })

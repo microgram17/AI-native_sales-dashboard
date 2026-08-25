@@ -1,8 +1,10 @@
 import { Component, useRef, useState, type ReactNode } from 'react'
 import type {
+  AnalyticsContext,
+  DataView,
+  DisplaySelection,
   VisualizationDataset,
   VisualizationSpec,
-  ToolCallInfo,
 } from '../../types/agent'
 import { findDataset } from '../../lib/datasetResolver'
 import { MetricCardsVisualization } from './MetricCardsVisualization'
@@ -20,40 +22,117 @@ import {
 const REQUESTED_METRICS_OPTION = '__requested_metrics__'
 
 interface RendererProps {
-  visualizations: VisualizationSpec[]
-  datasets: VisualizationDataset[]
-  toolCalls?: ToolCallInfo[]
+  displays: DisplaySelection[]
+  dataViews: DataView[]
+  dataContext?: AnalyticsContext | null
 }
 
 export function VisualizationRenderer({
-  visualizations,
-  datasets,
-  toolCalls = [],
+  displays,
+  dataViews,
+  dataContext,
 }: RendererProps) {
-  if (!visualizations || visualizations.length === 0) return null
+  const { language } = useTranslation()
+  if (!displays || displays.length === 0) return null
+
+  const cards = displays.flatMap((display) => {
+    const view = dataViews.find((candidate) => candidate.id === display.view_id)
+    if (!view) return []
+    return [{
+      spec: displayToSpec(display, view, language),
+      dataset: {
+        ...view,
+        source_call_id: '',
+        view: view.id,
+      } satisfies VisualizationDataset,
+    }]
+  })
 
   return (
     <div className="visualization-list">
-      {visualizations.map((spec, i) => (
+      {cards.map(({ spec, dataset }, i) => (
         <VisualizationCard
           key={`${spec.dataset}-${i}`}
           spec={spec}
-          datasets={datasets}
-          toolCalls={toolCalls}
+          datasets={[dataset]}
+          dataContext={dataContext}
         />
       ))}
     </div>
   )
 }
 
+function displayToSpec(
+  display: DisplaySelection,
+  view: DataView,
+  language: 'en' | 'sv',
+): VisualizationSpec {
+  const measureFields = view.fields.filter((field) => field.role === 'measure')
+  const available = new Set(measureFields.map((field) => field.key))
+  const requested = display.measure_keys.filter((key) => available.has(key))
+  const yKeys = requested.length > 0
+    ? requested
+    : view.default_measures.filter((key) => available.has(key))
+  const columns = view.fields.map((field) => field.key)
+  const title = display.title?.trim() || visualizationFieldLabel(language, view.id)
+
+  if (display.render_as === 'table') {
+    return {
+      dataset: view.id,
+      type: 'table',
+      title,
+      y_keys: [],
+      columns,
+    }
+  }
+
+  if (view.kind === 'metrics') {
+    return {
+      dataset: view.id,
+      type: 'metric_cards',
+      title,
+      y_keys: yKeys,
+      selectable_y_keys: measureFields.map((field) => field.key),
+      columns: [],
+    }
+  }
+
+  const primaryFormat = measureFields.find((field) => field.key === yKeys[0])?.format
+  const secondaryYKeys = yKeys.slice(1).filter((key) =>
+    measureFields.find((field) => field.key === key)?.format !== primaryFormat,
+  )
+
+  if (view.kind === 'categorical' || view.kind === 'timeseries') {
+    return {
+      dataset: view.id,
+      type: view.kind === 'timeseries' ? 'line_chart' : 'bar_chart',
+      title,
+      x_key: view.primary_dimension,
+      y_keys: yKeys,
+      secondary_y_keys: secondaryYKeys,
+      selectable_y_keys: measureFields.map((field) => field.key),
+      series_key: view.series_dimension,
+      columns: [],
+    }
+  }
+
+  return {
+    dataset: view.id,
+    type: 'table',
+    title,
+    y_keys: [],
+    columns,
+  }
+}
+
 function VisualizationCard({
   spec,
   datasets,
-  toolCalls,
+  dataContext,
 }: {
   spec: VisualizationSpec
   datasets: VisualizationDataset[]
-  toolCalls: ToolCallInfo[]
+  dataContext?: AnalyticsContext | null
 }) {
   const dataset = findDataset(datasets, spec.dataset)
   const { language, t } = useTranslation()
@@ -116,7 +195,7 @@ function VisualizationCard({
       )
     : []
   const exportFilters = dataset
-    ? getToolCallFilters(dataset, toolCalls, language)
+    ? getContextFilters(dataContext, language)
     : []
 
   return (
@@ -267,36 +346,24 @@ function getVisualizationExportColumns(
     }))
 }
 
-function getToolCallFilters(
-  dataset: VisualizationDataset,
-  toolCalls: ToolCallInfo[],
+function getContextFilters(
+  context: AnalyticsContext | null | undefined,
   language: 'en' | 'sv',
 ): ExportFilter[] {
-  const toolCall = toolCalls.find(
-    (call) => call.call_id === dataset.source_call_id,
-  )
-  if (!toolCall) return []
+  if (!context) return []
 
-  const filters: ExportFilter[] = []
+  const filters: ExportFilter[] = [
+    {
+      label: visualizationFieldLabel(language, 'period_start'),
+      value: context.effective_period.start,
+    },
+    {
+      label: visualizationFieldLabel(language, 'period_end'),
+      value: context.effective_period.end,
+    },
+  ]
 
-  for (const [key, value] of Object.entries(toolCall.arguments ?? {})) {
-    if (key === 'scope' && value && typeof value === 'object' && !Array.isArray(value)) {
-      for (const [scopeKey, scopeValue] of Object.entries(value as Record<string, unknown>)) {
-        if (
-          scopeValue == null ||
-          (Array.isArray(scopeValue) && scopeValue.length === 0)
-        ) {
-          continue
-        }
-
-        filters.push({
-          label: visualizationFieldLabel(language, scopeKey),
-          value: translateFilterValue(language, scopeValue),
-        })
-      }
-      continue
-    }
-
+  for (const [key, value] of Object.entries(context.effective_scope ?? {})) {
     if (
       value == null ||
       (Array.isArray(value) && value.length === 0)

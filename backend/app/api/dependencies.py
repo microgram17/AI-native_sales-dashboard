@@ -25,12 +25,8 @@ from app.services.authentication_service import (
 )
 from app.services.dashboard_service import DashboardService
 
-from app.agents.agents.analytics import build_analytics_agent
-from app.agents.agents.conversation import build_conversation_agent
-from app.agents.agents.interpreter import build_interpreter_agent
-from app.agents.graph import build_workflow
+from app.agents.agent import build_sales_agent
 from app.agents.models import build_model
-from app.integrations.mcp.client import McpClient
 from app.services.agent_service import AgentService
 
 
@@ -181,23 +177,17 @@ _AGENT_APP_NAME = "sales-agent"
 def _build_agent_service() -> AgentService:
     settings = get_settings()
     model = build_model(settings)
-    mcp = McpClient(settings.mcp_server_url)
-    workflow = build_workflow(
-        mcp=mcp,
-        interpreter=build_interpreter_agent(model),
-        analytics=build_analytics_agent(model),
-        conversation=build_conversation_agent(model),
-    )
+    agent, toolset = build_sales_agent(model, settings.mcp_server_url)
     session_service = InMemorySessionService()
     runner = Runner(
-        app_name=_AGENT_APP_NAME, agent=workflow, session_service=session_service
+        app_name=_AGENT_APP_NAME, agent=agent, session_service=session_service
     )
     return AgentService(
         runner=runner,
         session_service=session_service,
         app_name=_AGENT_APP_NAME,
-        mcp=mcp,
         settings=settings,
+        toolset=toolset,
     )
 
 
@@ -206,3 +196,9 @@ def get_agent_service() -> AgentService:
 
 
 AgentServiceDep = Annotated[AgentService, Depends(get_agent_service)]
+
+
+async def close_agent_service() -> None:
+    if _build_agent_service.cache_info().currsize:
+        await _build_agent_service().close()
+        _build_agent_service.cache_clear()

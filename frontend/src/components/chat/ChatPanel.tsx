@@ -51,10 +51,9 @@ export function ChatPanel({
           id: crypto.randomUUID(),
           role: 'assistant',
           content: data.message,
-          visualizations:
-            data.visualizations,
-          visualizationDatasets:
-            data.visualization_datasets,
+          displays: data.displays,
+          dataViews: data.data_views,
+          dataContext: data.data_context,
           toolCalls: data.tool_calls,
         },
       ])
@@ -178,12 +177,9 @@ export function ChatPanel({
             key={message.id}
             role={message.role}
             content={message.content}
-            visualizations={
-              message.visualizations
-            }
-            visualizationDatasets={
-              message.visualizationDatasets
-            }
+            displays={message.displays}
+            dataViews={message.dataViews}
+            dataContext={message.dataContext}
             toolCalls={message.toolCalls}
           />
         ))}

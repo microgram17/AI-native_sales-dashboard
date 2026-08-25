@@ -42,9 +42,9 @@ const baseResponse: AgentQueryResponse = {
   conversation_id: 'conv-1',
   message: 'Winner is Hoodie.',
   tool_calls: [],
-  datasets: [],
-  visualization_datasets: [],
-  visualizations: [],
+  data_context: null,
+  data_views: [],
+  displays: [],
 }
 
 let fetchMock: ReturnType<typeof vi.fn>
@@ -197,27 +197,44 @@ describe('ChatPanel', () => {
     expect(body.conversation_id).toBeNull()
   })
 
-  it('renders assistant text and normalized visualizations from the response', async () => {
+  it('renders assistant text and semantic data views from the response', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse({
         ...baseResponse,
         message: 'Here is the ranking.',
-        visualization_datasets: [
+        data_context: {
+          operation: 'ranking',
+          effective_period: {
+            start: '2026-01-01',
+            end: '2026-03-31',
+            label: 'Q1 2026',
+            defaulted: false,
+          },
+          effective_scope: {},
+          group_by: 'product',
+          rank_by: 'units',
+          order: 'highest',
+        },
+        data_views: [
           {
-            id: 'c1:ranking',
-            source_call_id: 'c1',
-            view: 'ranking',
+            id: 'ranking',
+            kind: 'categorical',
             rows: [{ entity_name: 'Hoodie', units: 40 }],
+            fields: [
+              { key: 'entity_name', role: 'dimension', format: 'text' },
+              { key: 'units', role: 'measure', format: 'integer' },
+            ],
+            primary_dimension: 'entity_name',
+            default_measures: ['units'],
+            default_visible: true,
           },
         ],
-        visualizations: [
+        displays: [
           {
-            dataset: 'c1:ranking',
-            type: 'bar_chart',
+            view_id: 'ranking',
+            render_as: 'default',
+            measure_keys: ['units'],
             title: 'Top products',
-            x_key: 'entity_name',
-            y_keys: ['units'],
-            columns: [],
           },
         ],
       }),

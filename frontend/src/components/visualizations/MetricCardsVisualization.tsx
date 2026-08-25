@@ -60,6 +60,7 @@ export function MetricCardsVisualization({
               {formatMetricValue(
                 key,
                 resolveField(row, key),
+                dataset.fields.find((field) => field.key === key)?.format,
               )}
             </div>
           </div>

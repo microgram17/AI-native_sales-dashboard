@@ -17,18 +17,21 @@ from pydantic import Field
 
 from app.context.supplier_context import SupplierContextError, SupplierContextResolver
 from app.contracts.sales import (
+    AnalyticsResult,
     GroupBy,
-    ProductOverviewResult,
     ProductResolutionResult,
     ProductOverviewScope,
     RankBy,
     RankOrder,
-    SalesRankingResult,
     SalesScope,
-    SalesSummaryResult,
-    SalesTrendResult,
     SplitBy,
     TrendGrain,
+)
+from app.contracts.views import (
+    overview_to_analytics,
+    ranking_to_analytics,
+    summary_to_analytics,
+    trend_to_analytics,
 )
 from app.services.sales_analytics_service import (
     AnalyticsRequestError,
@@ -97,7 +100,7 @@ def register_sales_tools(
         period_start: date | None = None,
         period_end: date | None = None,
         scope: SalesScope | None = None,
-    ) -> SalesSummaryResult:
+    ) -> AnalyticsResult:
         """Overall sales KPI summary for the current supplier.
 
         What it does: returns the standard KPI set (units, net/gross sales,
@@ -116,15 +119,15 @@ def register_sales_tools(
         - scope: optional filters (channels, cities, store_ids, categories,
           product_ids). Empty lists mean no restriction.
 
-        Returns: SalesSummaryResult with current metrics, optional previous-period
-        metrics and per-metric changes, plus the effective period and scope.
+        Returns: AnalyticsResult with effective context, a flat current metrics
+        view and an optional current-versus-previous comparison view.
 
         Examples:
         - "How are our sales doing?"
         - "Give me an overview of online sales this year."
         """
         supplier_id = supplier_resolver.resolve(ctx)
-        return await _run(
+        result = await _run(
             service.summary(
                 supplier_id=supplier_id,
                 period_start=period_start,
@@ -132,6 +135,7 @@ def register_sales_tools(
                 scope=scope or SalesScope(),
             )
         )
+        return summary_to_analytics(result)
 
     @mcp.tool()
     async def sales_rank(
@@ -143,7 +147,7 @@ def register_sales_tools(
         scope: SalesScope | None = None,
         limit: Annotated[int, Field(ge=1, le=20)] = 10,
         order: RankOrder = "highest",
-    ) -> SalesRankingResult:
+    ) -> AnalyticsResult:
         """Rank business entities and explain the result with full metrics.
 
         What it does: groups sales by one dimension (product, category, store,
@@ -174,9 +178,8 @@ def register_sales_tools(
           question, pass limit=N. Do not rely on the default when the requested
           cardinality is explicit.
 
-        Returns: SalesRankingResult with ranked rows (entity, metrics, share,
-        change), the rank_by total across the complete eligible population, the
-        rank_by total across only the returned rows, and the effective period/scope.
+        Returns: AnalyticsResult with effective context and one flat categorical
+        ranking view containing entity metrics, shares and changes.
 
         Examples:
         - "What is our best-selling product online?" (group_by=product,
@@ -188,7 +191,7 @@ def register_sales_tools(
           rank_by=net_sales, limit=5, order="highest").
         """
         supplier_id = supplier_resolver.resolve(ctx)
-        return await _run(
+        result = await _run(
             service.rank(
                 supplier_id=supplier_id,
                 group_by=group_by,
@@ -200,6 +203,7 @@ def register_sales_tools(
                 order=order,
             )
         )
+        return ranking_to_analytics(result)
 
     @mcp.tool()
     async def sales_trend(
@@ -210,7 +214,7 @@ def register_sales_tools(
         scope: SalesScope | None = None,
         split_by: SplitBy | None = None,
         series_limit: Annotated[int, Field(ge=1, le=10)] = 5,
-    ) -> SalesTrendResult:
+    ) -> AnalyticsResult:
         """Ordered sales time series, optionally split into a few series.
 
         What it does: returns metric snapshots per time bucket (day, week, month
@@ -231,8 +235,8 @@ def register_sales_tools(
           store, city, channel).
         - series_limit: max number of split series, 1–10 (default 5).
 
-        Returns: SalesTrendResult with chronologically ordered rows, each with an
-        optional series entity and a full metric snapshot.
+        Returns: AnalyticsResult with effective context and one flat timeseries
+        view whose rows include optional series identity and all metrics.
 
         Examples:
         - "Show monthly sales this year." (grain=month).
@@ -240,7 +244,7 @@ def register_sales_tools(
           split_by=channel).
         """
         supplier_id = supplier_resolver.resolve(ctx)
-        return await _run(
+        result = await _run(
             service.trend(
                 supplier_id=supplier_id,
                 grain=grain,
@@ -251,6 +255,7 @@ def register_sales_tools(
                 series_limit=series_limit,
             )
         )
+        return trend_to_analytics(result)
 
     @mcp.tool()
     async def product_overview(
@@ -259,7 +264,7 @@ def register_sales_tools(
         period_start: date | None = None,
         period_end: date | None = None,
         scope: ProductOverviewScope | None = None,
-    ) -> ProductOverviewResult:
+    ) -> AnalyticsResult:
         """Rich single-product overview assembled from several queries.
 
         What it does: resolves one product, then returns its KPI summary,
@@ -282,15 +287,15 @@ def register_sales_tools(
         - scope: optional filters (channels, cities, store_ids); empty lists mean
           no restriction. product_ids and categories are not accepted here.
 
-        Returns: ProductOverviewResult with the resolved product, summary metrics,
-        ranks, shares, monthly trend and channel/city breakdowns.
+        Returns: AnalyticsResult with the resolved entity in context and flat
+        current, comparison, trend, channel and city data views when available.
 
         Examples:
         - "How is the Minimal Logo Hoodie performing this year?"
         - "Give me an overview of product NORD-HOD-011."
         """
         supplier_id = supplier_resolver.resolve(ctx)
-        return await _run(
+        result = await _run(
             service.product_overview(
                 supplier_id=supplier_id,
                 product=product,
@@ -299,3 +304,4 @@ def register_sales_tools(
                 scope=scope or ProductOverviewScope(),
             )
         )
+        return overview_to_analytics(result)

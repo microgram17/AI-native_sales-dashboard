@@ -29,17 +29,25 @@ export function metricFamily(key: string): MetricFamily {
   return 'number'
 }
 
-export function formatMetricValue(key: string, value: unknown): string {
+export function formatMetricValue(
+  key: string,
+  value: unknown,
+  format?: DataFieldFormat,
+): string {
   if (value == null || value === '') return '—'
   if (typeof value !== 'number' || Number.isNaN(value)) return String(value)
 
   const family = metricFamily(key)
-  if (family === 'rate') {
-    const pct = Math.abs(value) <= 1 ? value * 100 : value
+  if (format === 'percentage_fraction' || (!format && family === 'rate')) {
+    const pct = format === 'percentage_fraction'
+      ? value * 100
+      : Math.abs(value) <= 1 ? value * 100 : value
     return `${DEC.format(pct)}%`
   }
-  if (family === 'currency') return SEK.format(value)
-  if (family === 'count') return INT.format(value)
+  if (format === 'currency_sek' || (!format && family === 'currency')) {
+    return SEK.format(value)
+  }
+  if (format === 'integer' || (!format && family === 'count')) return INT.format(value)
   return DEC.format(value)
 }
 
@@ -47,3 +55,4 @@ export function humanizeKey(key: string): string {
   const cleaned = key.replace(/_/g, ' ').trim()
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
 }
+import type { DataFieldFormat } from '../types/agent'

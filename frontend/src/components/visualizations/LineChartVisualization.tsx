@@ -9,6 +9,7 @@ import {
   Legend,
 } from 'recharts'
 import type {
+  DataFieldFormat,
   VisualizationDataset,
   VisualizationSpec,
 } from '../../types/agent'
@@ -59,6 +60,7 @@ function formatAxisTick(
   metricKey: string,
   value: unknown,
   language: Language,
+  format?: DataFieldFormat,
 ): string {
   if (
     typeof value !== 'number' ||
@@ -67,9 +69,11 @@ function formatAxisTick(
     return String(value ?? '')
   }
 
-  if (isRateKey(metricKey)) {
+  if (format === 'percentage_fraction' || (!format && isRateKey(metricKey))) {
     const percentage =
-      Math.abs(value) <= 1 ? value * 100 : value
+      format === 'percentage_fraction'
+        ? value * 100
+        : Math.abs(value) <= 1 ? value * 100 : value
 
     const locale = language === 'sv' ? 'sv-SE' : 'en-SE'
 
@@ -200,7 +204,12 @@ export function LineChartVisualization({
 
           <YAxis
             tickFormatter={(value) =>
-              formatAxisTick(metricKey, value, language)
+              formatAxisTick(
+                metricKey,
+                value,
+                language,
+                dataset.fields.find((field) => field.key === metricKey)?.format,
+              )
             }
             tick={axisTick}
             axisLine={axisLine}
@@ -212,6 +221,7 @@ export function LineChartVisualization({
               formatMetricValue(
                 metricKey,
                 value,
+                dataset.fields.find((field) => field.key === metricKey)?.format,
               ),
               String(name),
             ]}
@@ -319,6 +329,7 @@ export function LineChartVisualization({
               primaryMetricKey,
               value,
               language,
+              dataset.fields.find((field) => field.key === primaryMetricKey)?.format,
             )
           }
           tick={axisTick}
@@ -351,6 +362,7 @@ export function LineChartVisualization({
                   secondaryMetricKey,
                   value,
                   language,
+                  dataset.fields.find((field) => field.key === secondaryMetricKey)?.format,
                 )
               }
               tick={axisTick}
@@ -375,6 +387,7 @@ export function LineChartVisualization({
             formatMetricValue(
               String(name),
               value,
+              dataset.fields.find((field) => field.key === String(name))?.format,
             ),
             visualizationFieldLabel(language, String(name)),
           ]}

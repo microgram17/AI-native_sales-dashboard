@@ -8,7 +8,7 @@ chart types or frontend component information — only semantic analytical data.
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,6 +30,16 @@ RankOrder = Literal["highest", "lowest"]
 TrendGrain = Literal["day", "week", "month", "quarter"]
 Status = Literal["success", "no_data", "not_found", "ambiguous"]
 ProductResolutionStatus = Literal["success", "not_found", "ambiguous"]
+DataViewKind = Literal["metrics", "categorical", "timeseries"]
+DataFieldRole = Literal["dimension", "measure"]
+DataFieldFormat = Literal[
+    "text",
+    "date",
+    "integer",
+    "decimal",
+    "currency_sek",
+    "percentage_fraction",
+]
 
 
 # ── Model-visible scope ─────────────────────────────────────────────────────────
@@ -107,6 +117,64 @@ class AnalyticsEntity(BaseModel):
     type: EntityType
     id: str | None = None
     name: str
+
+
+class DataField(BaseModel):
+    """Semantic metadata used by clients to format a flat result field."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    role: DataFieldRole
+    format: DataFieldFormat
+
+
+class DataView(BaseModel):
+    """A flat, renderer-neutral analytical view.
+
+    ``kind`` describes the data shape rather than a concrete chart library or
+    component. Clients may render metrics as cards, categorical data as bars,
+    and timeseries data as lines, or fall back to a table.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    kind: DataViewKind
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    fields: list[DataField] = Field(default_factory=list)
+    primary_dimension: str | None = None
+    series_dimension: str | None = None
+    default_measures: list[str] = Field(default_factory=list)
+    default_visible: bool = True
+
+
+class AnalyticsContext(BaseModel):
+    """The effective query semantics shared by all views in one result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation: Literal["summary", "ranking", "trend", "product_overview"]
+    effective_period: EffectivePeriod
+    effective_scope: SalesScope
+    grain: TrendGrain | None = None
+    group_by: GroupBy | None = None
+    rank_by: RankBy | None = None
+    order: RankOrder | None = None
+    split_by: SplitBy | None = None
+    entity: AnalyticsEntity | None = None
+
+
+class AnalyticsResult(BaseModel):
+    """Common public result returned by every analytics MCP tool."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Status
+    context: AnalyticsContext
+    warnings: list[str] = Field(default_factory=list)
+    candidates: list[AnalyticsEntity] = Field(default_factory=list)
+    views: list[DataView] = Field(default_factory=list)
 
 
 class MetricSnapshot(BaseModel):

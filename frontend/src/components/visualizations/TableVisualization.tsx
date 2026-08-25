@@ -59,7 +59,11 @@ export function TableVisualization({
                 const value = resolveField(row, column)
                 const display =
                   typeof value === 'number'
-                    ? formatMetricValue(column, value)
+                    ? formatMetricValue(
+                        column,
+                        value,
+                        dataset.fields.find((field) => field.key === column)?.format,
+                      )
                     : String(
                         visualizationValueLabel(language, value) ?? '',
                       )

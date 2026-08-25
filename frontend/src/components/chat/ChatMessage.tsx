@@ -1,7 +1,8 @@
 import ReactMarkdown from 'react-markdown'
 import type {
-  VisualizationDataset,
-  VisualizationSpec,
+  AnalyticsContext,
+  DataView,
+  DisplaySelection,
   ToolCallInfo,
 } from '../../types/agent'
 import { VisualizationRenderer } from '../visualizations/VisualizationRenderer'
@@ -9,17 +10,18 @@ import { VisualizationRenderer } from '../visualizations/VisualizationRenderer'
 interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
-  visualizations?: VisualizationSpec[]
-  visualizationDatasets?: VisualizationDataset[]
+  displays?: DisplaySelection[]
+  dataViews?: DataView[]
+  dataContext?: AnalyticsContext | null
   toolCalls?: ToolCallInfo[]
 }
 
 export function ChatMessage({
   role,
   content,
-  visualizations,
-  visualizationDatasets,
-  toolCalls,
+  displays,
+  dataViews,
+  dataContext,
 }: ChatMessageProps) {
   if (role === 'user') {
     return (
@@ -31,8 +33,7 @@ export function ChatMessage({
     )
   }
 
-  const hasVisualizations =
-    Array.isArray(visualizations) && visualizations.length > 0
+  const hasVisualizations = Array.isArray(displays) && displays.length > 0
 
   return (
     <div className="message message-assistant">
@@ -70,9 +71,9 @@ export function ChatMessage({
         {hasVisualizations && (
           <div className="assistant-message-visualizations">
             <VisualizationRenderer
-              visualizations={visualizations}
-              datasets={visualizationDatasets ?? []}
-              toolCalls={toolCalls ?? []}
+              displays={displays ?? []}
+              dataViews={dataViews ?? []}
+              dataContext={dataContext}
             />
           </div>
         )}

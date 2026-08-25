@@ -1,46 +1,63 @@
-export type VisualizationType = 'metric_cards' | 'bar_chart' | 'line_chart' | 'table'
+export type UiLanguage = 'en' | 'sv'
 
-export interface VisualizationSpec {
-  dataset: string
-  type: VisualizationType
-  title: string
-  x_key?: string | null
-  y_keys: string[]
-  /**
-   * Subset of y_keys rendered against the secondary/right Y axis.
-   * Empty/undefined means a normal single-axis visualization.
-   */
-  secondary_y_keys?: string[]
-  /** Metrics that can be selected locally without another agent request. */
-  selectable_y_keys?: string[]
-  series_key?: string | null
-  columns: string[]
+export type DataFieldFormat =
+  | 'text'
+  | 'date'
+  | 'integer'
+  | 'decimal'
+  | 'currency_sek'
+  | 'percentage_fraction'
+
+export interface DataField {
+  key: string
+  role: 'dimension' | 'measure'
+  format: DataFieldFormat
 }
 
-export interface VisualizationDataset {
+export interface DataView {
   id: string
-  source_call_id: string
-  view: string
+  kind: 'metrics' | 'categorical' | 'timeseries'
   rows: Record<string, unknown>[]
+  fields: DataField[]
+  primary_dimension?: string | null
+  series_dimension?: string | null
+  default_measures: string[]
+  default_visible: boolean
+}
+
+export interface EffectivePeriod {
+  start: string
+  end: string
+  label?: string | null
+  defaulted: boolean
+}
+
+export interface AnalyticsContext {
+  operation: 'summary' | 'ranking' | 'trend' | 'product_overview'
+  effective_period: EffectivePeriod
+  effective_scope: WidgetAnalysisScope & { product_ids?: string[] }
+  grain?: 'day' | 'week' | 'month' | 'quarter' | null
+  group_by?: 'product' | 'category' | 'store' | 'city' | 'channel' | null
+  rank_by?: string | null
+  order?: 'highest' | 'lowest' | null
+  split_by?: 'product' | 'category' | 'store' | 'city' | 'channel' | null
+  entity?: { type: string; id?: string | null; name: string } | null
+}
+
+export interface DisplaySelection {
+  view_id: string
+  render_as: 'default' | 'table'
+  measure_keys: string[]
+  title?: string | null
 }
 
 export interface ToolCallInfo {
   call_id: string
   tool_name: string
   arguments: Record<string, unknown>
-  purpose?: string | null
   status?: string | null
   error?: string | null
 }
-
-export interface Dataset {
-  call_id: string
-  tool_name: string
-  status: string
-  result: Record<string, unknown>
-}
-
-export type UiLanguage = 'en' | 'sv'
 
 export interface DashboardChatContext {
   date_from: string
@@ -86,16 +103,37 @@ export interface AgentQueryResponse {
   conversation_id: string
   message: string
   tool_calls: ToolCallInfo[]
-  datasets: Dataset[]
-  visualization_datasets: VisualizationDataset[]
-  visualizations: VisualizationSpec[]
+  data_context?: AnalyticsContext | null
+  data_views: DataView[]
+  displays: DisplaySelection[]
 }
 
 export interface ChatEntry {
   id: string
   role: 'user' | 'assistant'
   content: string
-  visualizations?: VisualizationSpec[]
-  visualizationDatasets?: VisualizationDataset[]
+  displays?: DisplaySelection[]
+  dataViews?: DataView[]
+  dataContext?: AnalyticsContext | null
   toolCalls?: ToolCallInfo[]
+}
+
+// Internal renderer adapter contracts. These are not part of the HTTP API.
+export type VisualizationType = 'metric_cards' | 'bar_chart' | 'line_chart' | 'table'
+
+export interface VisualizationSpec {
+  dataset: string
+  type: VisualizationType
+  title: string
+  x_key?: string | null
+  y_keys: string[]
+  secondary_y_keys?: string[]
+  selectable_y_keys?: string[]
+  series_key?: string | null
+  columns: string[]
+}
+
+export interface VisualizationDataset extends DataView {
+  source_call_id: string
+  view: string
 }

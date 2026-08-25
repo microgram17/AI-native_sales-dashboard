@@ -32,6 +32,15 @@ async def test_all_tools_have_output_schema(mcp_server):
         assert tool.outputSchema is not None, tool.name
 
 
+async def test_analytics_output_schema_is_the_unified_view_contract(mcp_server):
+    tools = {tool.name: tool for tool in await mcp_server.list_tools()}
+    for name in EXPECTED_TOOLS - {"resolve_product"}:
+        properties = tools[name].outputSchema["properties"]
+        assert set(properties) == {"status", "context", "warnings", "candidates", "views"}
+        assert "current" not in properties
+        assert "rows" not in properties
+
+
 async def test_scope_is_a_nested_object_in_schema(mcp_server):
     tools = {tool.name: tool for tool in await mcp_server.list_tools()}
     summary = tools["sales_summary"]
@@ -65,10 +74,11 @@ async def test_limit_out_of_range_is_rejected(mcp_server):
 
 
 async def test_call_summary_returns_structured_content(mcp_server):
-    content, structured = await mcp_server.call_tool("sales_summary", {})
+    _content, structured = await mcp_server.call_tool("sales_summary", {})
     assert structured["status"] in {"success", "no_data"}
-    assert "effective_period" in structured
-    assert "effective_scope" in structured
+    assert structured["context"]["operation"] == "summary"
+    assert "effective_period" in structured["context"]
+    assert "effective_scope" in structured["context"]
 
 
 async def test_call_rank_online_returns_structured(mcp_server):
@@ -82,8 +92,9 @@ async def test_call_rank_online_returns_structured(mcp_server):
         },
     )
     assert structured["status"] == "success"
-    assert structured["group_by"] == "product"
-    assert structured["rows"]
+    assert structured["context"]["group_by"] == "product"
+    assert structured["views"][0]["id"] == "ranking"
+    assert structured["views"][0]["rows"]
     assert "supplier_id" not in structured
 
 
@@ -128,9 +139,9 @@ async def test_rank_rows_expose_supporting_metrics(mcp_server):
         "sales_rank",
         {"group_by": "product", "rank_by": "units", "limit": 3},
     )
-    metrics = structured["rows"][0]["metrics"]
-    assert "average_selling_price" in metrics
-    assert "discount_rate" in metrics
+    row = structured["views"][0]["rows"][0]
+    assert "average_selling_price" in row
+    assert "discount_rate" in row
 
 
 # product_overview 7: accepts channel/city/store filters
@@ -188,7 +199,7 @@ async def test_run_passes_through_supplier_context_error():
         await _run(boom())
 
 
-async def test_rank_exposes_unambiguous_population_and_returned_totals(mcp_server):
+async def test_rank_returns_one_flat_semantic_payload(mcp_server):
     _content, structured = await mcp_server.call_tool(
         "sales_rank",
         {
@@ -201,12 +212,29 @@ async def test_rank_exposes_unambiguous_population_and_returned_totals(mcp_serve
     )
 
     assert structured["status"] == "success"
-    assert "total_population_rank_metric_value" in structured
-    assert "returned_rows_rank_metric_value" in structured
-    assert "total_rank_metric_value" not in structured
-    assert structured["total_population_rank_metric_value"] >= structured[
-        "returned_rows_rank_metric_value"
-    ]
+    assert set(structured) == {"status", "context", "warnings", "candidates", "views"}
+    view = structured["views"][0]
+    assert view["kind"] == "categorical"
+    assert view["primary_dimension"] == "entity_name"
+    assert view["default_measures"] == ["net_sales"]
+    assert isinstance(view["rows"][0]["net_sales"], float)
+
+
+async def test_trend_view_declares_formats_and_dimensions(mcp_server):
+    _content, structured = await mcp_server.call_tool(
+        "sales_trend",
+        {
+            "grain": "month",
+            "period_start": "2026-01-01",
+            "period_end": "2026-06-30",
+        },
+    )
+    view = structured["views"][0]
+    fields = {field["key"]: field for field in view["fields"]}
+    assert view["kind"] == "timeseries"
+    assert view["primary_dimension"] == "period_label"
+    assert fields["net_sales"]["format"] == "currency_sek"
+    assert fields["discount_rate"]["format"] == "percentage_fraction"
 
 
 async def test_resolve_product_exact_name(mcp_server):
