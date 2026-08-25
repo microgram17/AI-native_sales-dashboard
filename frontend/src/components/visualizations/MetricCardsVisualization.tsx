@@ -1,27 +1,29 @@
 import type {
-  VisualizationDataset,
+  DataView,
   VisualizationSpec,
 } from '../../types/agent'
 import {
-  datasetToRows,
+  dataViewToRows,
   numericFieldExists,
   resolveField,
-} from '../../lib/datasetResolver'
+} from '../../lib/dataView'
 import { formatMetricValue } from '../../lib/format'
 import { useTranslation } from '../../i18n/LanguageContext'
 import { visualizationFieldLabel } from '../../i18n/translations'
 
 interface Props {
   spec: VisualizationSpec
-  dataset: VisualizationDataset
+  dataView: DataView
+  highlightedMetric?: string | null
 }
 
 export function MetricCardsVisualization({
   spec,
-  dataset,
+  dataView,
+  highlightedMetric,
 }: Props) {
   const { language, t } = useTranslation()
-  const rows = datasetToRows(dataset)
+  const rows = dataViewToRows(dataView)
   const row = rows[0]
 
   if (!row) return <Fallback text={t.vizNoMetrics} />
@@ -32,7 +34,11 @@ export function MetricCardsVisualization({
       resolveField(row, key) !== undefined,
   )
 
-  if (usable.length === 0) return <Fallback text={t.vizNoMetrics} />
+  const orderedMetrics = highlightedMetric && usable.includes(highlightedMetric)
+    ? [highlightedMetric, ...usable.filter((key) => key !== highlightedMetric)]
+    : usable
+
+  if (orderedMetrics.length === 0) return <Fallback text={t.vizNoMetrics} />
 
   const caption =
     (resolveField(row, 'product_name') as string | undefined) ??
@@ -48,23 +54,33 @@ export function MetricCardsVisualization({
       )}
 
       <div className="visualization-metric-grid">
-        {usable.map((key) => (
+        {orderedMetrics.map((key) => {
+          const isHighlighted = key === highlightedMetric
+          return (
           <div
             key={key}
-            className="visualization-metric-card"
+            className={[
+              'visualization-metric-card',
+              isHighlighted ? 'is-ranking-metric' : '',
+            ].filter(Boolean).join(' ')}
           >
             <div className="visualization-metric-label">
               {visualizationFieldLabel(language, key)}
             </div>
             <div className="visualization-metric-value">
               {formatMetricValue(
-                key,
                 resolveField(row, key),
-                dataset.fields.find((field) => field.key === key)?.format,
+                dataView.fields.find((field) => field.key === key)?.format ?? 'decimal',
               )}
             </div>
+            {isHighlighted && (
+              <div className="visualization-ranking-badge">
+                {t.rankingMetric}
+              </div>
+            )}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

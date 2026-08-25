@@ -78,7 +78,7 @@ def main() -> int:
             passed = True
             for turn in case["turns"]:
                 response = client.post(
-                    "/agent/query-v2",
+                    "/agent/query",
                     json={
                         "message": turn["message"],
                         "conversation_id": conversation_id,

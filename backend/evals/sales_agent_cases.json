@@ -4,7 +4,7 @@
   {"id":"en_summary_online","group":"core","language":"en","turns":[{"message":"Give me an overview of online sales in 2026","tool":"sales_summary","args":{"period_start":"2026-01-01","period_end":"2026-12-31","scope":{"channels":["online"]}}}]},
   {"id":"sv_summary_physical","group":"core","language":"sv","turns":[{"message":"Sammanfatta försäljningen i fysiska butiker under 2026","tool":"sales_summary","args":{"period_start":"2026-01-01","period_end":"2026-12-31","scope":{"channels":["physical"]}}}]},
   {"id":"en_top_products","group":"core","language":"en","turns":[{"message":"Show the top 5 products by units","tool":"sales_rank","args":{"group_by":"product","rank_by":"units","limit":5,"order":"highest"}}]},
-  {"id":"sv_top_products","group":"core","language":"sv","turns":[{"message":"Visa de fem bäst säljande produkterna","tool":"sales_rank","args":{"group_by":"product","rank_by":"units","limit":5,"order":"highest"}}]},
+  {"id":"sv_top_products","group":"core","language":"sv","turns":[{"message":"Visa de fem bäst säljande produkterna","tool":"sales_rank","args":{"group_by":"product","rank_by":"net_sales","limit":5,"order":"highest"}}]},
   {"id":"en_bottom_stores","group":"core","language":"en","turns":[{"message":"Which 3 stores have the lowest net sales?","tool":"sales_rank","args":{"group_by":"store","rank_by":"net_sales","limit":3,"order":"lowest"}}]},
   {"id":"sv_bottom_cities","group":"core","language":"sv","turns":[{"message":"Vilka tre städer har lägst nettoomsättning?","tool":"sales_rank","args":{"group_by":"city","rank_by":"net_sales","limit":3,"order":"lowest"}}]},
   {"id":"en_category_rank","group":"core","language":"en","turns":[{"message":"Rank categories by gross sales","tool":"sales_rank","args":{"group_by":"category","rank_by":"gross_sales"}}]},
@@ -34,6 +34,6 @@
   {"id":"follow_bottom","group":"followup","language":"en","turns":[{"message":"Show top five stores","tool":"sales_rank"},{"message":"Now show the bottom five","tool":"sales_rank","args":{"order":"lowest","limit":5}}]},
   {"id":"follow_product","group":"followup","language":"en","turns":[{"message":"How is Minimal Logo Hoodie doing?","tool":"product_overview"},{"message":"What about online only?","tool":"product_overview","args":{"scope":{"channels":["online"]}}}]},
   {"id":"follow_product_sv","group":"followup","language":"sv","turns":[{"message":"Hur går det för Minimal Logo Hoodie?","tool":"product_overview"},{"message":"Och i Stockholm?","tool":"product_overview","args":{"scope":{"cities":["Stockholm"]}}}]},
-  {"id":"follow_graph","group":"followup","language":"en","turns":[{"message":"Summarize online sales for Q1 2026","tool":"sales_summary"},{"message":"Graph that","tool":null}]},
+  {"id":"follow_graph","group":"followup","language":"en","turns":[{"message":"Summarize online sales for Q1 2026","tool":"sales_summary"},{"message":"Graph that","tool":"sales_trend","args":{"grain":"month","period_start":"2026-01-01","period_end":"2026-03-31","scope":{"channels":["online"]}}}]},
   {"id":"follow_more","group":"followup","language":"sv","turns":[{"message":"Visa topp fem produkter","tool":"sales_rank","args":{"limit":5}},{"message":"Visa tio i stället","tool":"sales_rank","args":{"limit":10}}]}
 ]

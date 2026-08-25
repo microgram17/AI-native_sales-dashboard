@@ -1,6 +1,6 @@
 """Idempotently seed local development login accounts.
 
-Creates up to three supplier accounts (one per active supplier) and one retailer
+Creates one supplier account per active supplier and one retailer
 admin account. Supplier accounts receive only supplier-scoped roles; retailer
 admin is an application-level account type and has no supplier membership.
 
@@ -41,7 +41,6 @@ def _demo_password() -> str:
 
 def load_demo_suppliers(
     conn: Connection,
-    limit: int = 3,
 ) -> list[SupplierSeed]:
     with conn.cursor() as cur:
         cur.execute(
@@ -50,9 +49,7 @@ def load_demo_suppliers(
             FROM suppliers
             WHERE active = true
             ORDER BY supplier_id
-            LIMIT %s
             """,
-            (limit,),
         )
         return [
             SupplierSeed(

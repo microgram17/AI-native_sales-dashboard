@@ -808,6 +808,20 @@ html.dark .kpi-change.negative {
   font-size: 12px;
 }
 
+.visualization-ranking-basis {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: -2px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.visualization-ranking-basis strong {
+  color: var(--text-h);
+  font-weight: 650;
+}
+
 .visualization-fallback {
   color: var(--muted);
   font-size: 12px;
@@ -817,23 +831,46 @@ html.dark .kpi-change.negative {
   display: grid;
   grid-template-columns: repeat(
     auto-fit,
-    minmax(120px, 1fr)
+    minmax(min(100%, 180px), 1fr)
   );
-  gap: 8px;
+  gap: 10px;
 }
 
 .visualization-metric-card {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 10px 12px;
+  min-height: 82px;
+  padding: 12px 14px;
   border: 1px solid var(--viz-border);
   border-radius: 8px;
   background: var(--viz-metric-bg);
 }
 
+.visualization-metric-card.is-ranking-metric {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .visualization-metric-label {
-  margin-bottom: 3px;
+  margin-bottom: 6px;
   color: var(--muted);
   font-size: 11px;
+  line-height: 1.35;
+}
+
+.visualization-ranking-badge {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 3px 7px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
 }
 
 .visualization-metric-value {

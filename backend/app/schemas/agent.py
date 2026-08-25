@@ -13,6 +13,7 @@ Metric = Literal[
 ]
 Grain = Literal["day", "week", "month", "quarter"]
 GroupBy = Literal["product", "category", "store", "city", "channel"]
+EntityType = GroupBy
 RankMetric = Literal["units", "net_sales", "gross_sales", "discounts", "orders"]
 Channel = Literal["online", "physical"]
 
@@ -39,7 +40,7 @@ class EffectivePeriod(BaseModel):
 class AnalyticsEntity(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: str
+    type: EntityType
     id: str | None = None
     name: str
 
@@ -171,6 +172,8 @@ class DashboardWidgetAnalysis(BaseModel):
 
 
 class AgentQueryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str
     conversation_id: str | None = None
     language: UiLanguage = "sv"

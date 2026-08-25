@@ -96,7 +96,8 @@ export interface Translations {
   vizNoValidColumns: string
   vizUnsupported: string
   vizRenderError: string
-  vizMissingDataset: (dataset: string) => string
+  rankedBy: string
+  rankingMetric: string
   // Export
   export: string
   exporting: string
@@ -211,7 +212,8 @@ export const translations: Record<Language, Translations> = {
     vizNoValidColumns: 'No valid table columns were provided.',
     vizUnsupported: 'Unsupported visualization type.',
     vizRenderError: 'This visualization could not be rendered.',
-    vizMissingDataset: (dataset) => `No visualization dataset "${dataset}".`,
+    rankedBy: 'Ranked by',
+    rankingMetric: 'Ranking metric',
     export: 'Export',
     exporting: 'Exporting…',
     exportExcel: 'Excel (.xlsx)',
@@ -323,7 +325,8 @@ export const translations: Record<Language, Translations> = {
     vizNoValidColumns: 'Inga giltiga tabellkolumner angavs.',
     vizUnsupported: 'Visualiseringstypen stöds inte.',
     vizRenderError: 'Visualiseringen kunde inte renderas.',
-    vizMissingDataset: (dataset) => `Visualiseringsdata "${dataset}" saknas.`,
+    rankedBy: 'Rangordnad efter',
+    rankingMetric: 'Rankningsmått',
     export: 'Exportera',
     exporting: 'Exporterar…',
     exportExcel: 'Excel (.xlsx)',

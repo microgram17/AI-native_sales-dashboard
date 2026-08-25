@@ -4,18 +4,12 @@ from mcp.server.fastmcp import FastMCP
 
 from app.context.supplier_context import build_supplier_context_resolver
 from app.db.engine import get_engine
+from app.db.windows_asyncio import configure_windows_event_loop
 from app.repositories.sales_analytics_repository import SalesAnalyticsRepository
 from app.services.sales_analytics_service import SalesAnalyticsService
 from app.tools.sales_tools import register_sales_tools
 
-# Keep this only if you added the Windows asyncio helper.
-# It is harmless on Linux if the helper checks sys.platform == "win32".
-try:
-    from app.db.windows_asyncio import configure_windows_event_loop
-
-    configure_windows_event_loop()
-except ImportError:
-    pass
+configure_windows_event_loop()
 
 
 mcp = FastMCP(

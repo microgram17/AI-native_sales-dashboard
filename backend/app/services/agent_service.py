@@ -14,6 +14,7 @@ from google.genai import types
 from app.agents.agent import (
     LAST_ANALYTICS_RESULT,
     MCP_TOKEN,
+    TURN_ANALYTICS_RESERVED,
     TURN_ANALYTICS_CALLED,
     TURN_ANALYTICS_RESULT,
     TURN_TOOL_CALLS,
@@ -40,6 +41,23 @@ DASHBOARD_CONTEXT_JSON = "dashboard_context_json"
 WIDGET_ANALYSIS_JSON = "widget_analysis_json"
 LAST_VIEWS_SUMMARY_JSON = "last_views_summary_json"
 AGENT_TURN_OUTPUT = "agent_turn_output"
+
+_RANK_METRIC_LABELS = {
+    "en": {
+        "units": "units sold",
+        "net_sales": "net sales",
+        "gross_sales": "gross sales",
+        "discounts": "discounts",
+        "orders": "number of orders",
+    },
+    "sv": {
+        "units": "sålda enheter",
+        "net_sales": "nettoomsättning",
+        "gross_sales": "bruttoomsättning",
+        "discounts": "rabatter",
+        "orders": "antal beställningar",
+    },
+}
 
 
 class ConversationSupplierMismatchError(Exception):
@@ -114,6 +132,7 @@ class AgentService:
             LAST_VIEWS_SUMMARY_JSON: _summarize_views(last_result),
             MCP_TOKEN: token,
             TURN_TOOL_CALLS: [],
+            TURN_ANALYTICS_RESERVED: False,
             TURN_ANALYTICS_CALLED: False,
             TURN_ANALYTICS_RESULT: None,
             AGENT_TURN_OUTPUT: None,
@@ -160,7 +179,11 @@ class AgentService:
 
         return AgentQueryResponse(
             conversation_id=conversation_id,
-            message=turn.message,
+            message=_with_ranking_disclosure(
+                turn.message,
+                analytics_context,
+                request.language,
+            ),
             tool_calls=_coerce_tool_calls(final_state.get(TURN_TOOL_CALLS)),
             data_context=analytics_context if displays else None,
             data_views=views if displays else [],
@@ -173,6 +196,25 @@ def _json_model(value: Any) -> str:
         value.model_dump(mode="json") if value is not None else None,
         ensure_ascii=False,
     )
+
+
+def _with_ranking_disclosure(
+    message: str,
+    context: AnalyticsContext | None,
+    language: str,
+) -> str:
+    """State the validated ranking basis without relying on model wording."""
+
+    if context is None or context.operation != "ranking" or not context.rank_by:
+        return message
+    labels = _RANK_METRIC_LABELS.get(language, _RANK_METRIC_LABELS["en"])
+    label = labels.get(context.rank_by, context.rank_by)
+    disclosure = (
+        f"Rankningen baseras på **{label}**."
+        if language == "sv"
+        else f"This ranking is based on **{label}**."
+    )
+    return f"{disclosure}\n\n{message}"
 
 
 def _summarize_views(value: Any) -> str:

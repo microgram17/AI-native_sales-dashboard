@@ -4,12 +4,14 @@ from types import SimpleNamespace
 
 from app.agents.agent import (
     LAST_ANALYTICS_RESULT,
+    TURN_ANALYTICS_RESERVED,
     TURN_ANALYTICS_CALLED,
     TURN_ANALYTICS_RESULT,
     TURN_TOOL_CALLS,
     _headers,
     build_sales_agent,
     capture_tool_result,
+    enforce_tool_budget,
 )
 from app.schemas.agent import AgentTurnOutput
 from google.adk.models.lite_llm import LiteLlm
@@ -25,6 +27,7 @@ from app.services.agent_service import (
     _coerce_result,
     _default_displays,
     _validate_displays,
+    _with_ranking_disclosure,
 )
 
 
@@ -84,7 +87,9 @@ def test_architecture_is_one_native_tool_enabled_agent() -> None:
     assert agent.name == "sales_agent"
     assert agent.tools == [toolset]
     assert agent.output_schema is AgentTurnOutput
+    assert agent.before_tool_callback is enforce_tool_budget
     assert agent.after_tool_callback is capture_tool_result
+    assert toolset.connection_params.url == "http://localhost:8001/mcp"
 
 
 def test_mcp_header_comes_only_from_invocation_state() -> None:
@@ -110,6 +115,37 @@ def test_callback_captures_views_without_transforming_rows() -> None:
     assert state[TURN_ANALYTICS_RESULT]["views"][0]["rows"] == result["views"][0]["rows"]
     assert state[LAST_ANALYTICS_RESULT] == result
     assert state[TURN_TOOL_CALLS][0]["arguments"] == {"grain": "month"}
+
+
+def test_tool_budget_blocks_execution_after_first_analytics_call() -> None:
+    state: dict = {TURN_ANALYTICS_CALLED: True, TURN_TOOL_CALLS: []}
+    context = SimpleNamespace(state=state, function_call_id="fc-blocked")
+    tool = SimpleNamespace(name="sales_trend")
+
+    blocked = enforce_tool_budget(tool=tool, args={}, tool_context=context)
+
+    assert blocked["isError"] is True
+    capture_tool_result(
+        tool=tool,
+        args={"grain": "month"},
+        tool_context=context,
+        tool_response=blocked,
+    )
+    assert state[TURN_TOOL_CALLS] == []
+
+
+def test_tool_budget_reserves_parallel_analytics_slot() -> None:
+    state: dict = {
+        TURN_ANALYTICS_CALLED: False,
+        TURN_ANALYTICS_RESERVED: False,
+    }
+    context = SimpleNamespace(state=state, function_call_id="fc-parallel")
+    tool = SimpleNamespace(name="sales_trend")
+
+    assert enforce_tool_budget(tool=tool, args={}, tool_context=context) is None
+    assert state[TURN_ANALYTICS_RESERVED] is True
+    blocked = enforce_tool_budget(tool=tool, args={}, tool_context=context)
+    assert blocked["isError"] is True
 
 
 def test_non_success_result_does_not_replace_reusable_views() -> None:
@@ -255,6 +291,24 @@ def test_single_item_ranking_display_uses_all_default_metrics() -> None:
         "net_sales",
         "discount_rate",
     ]
+
+
+def test_ranking_message_deterministically_discloses_metric() -> None:
+    context, _ = _coerce_result(ranking_result())
+
+    assert _with_ranking_disclosure("Hoodie wins.", context, "en") == (
+        "This ranking is based on **net sales**.\n\nHoodie wins."
+    )
+    assert _with_ranking_disclosure("Hoodie vinner.", context, "sv") == (
+        "Rankningen baseras på **nettoomsättning**.\n\nHoodie vinner."
+    )
+
+
+def test_non_ranking_message_is_unchanged() -> None:
+    context, _ = _coerce_result(analytics_result())
+    assert _with_ranking_disclosure("Sales increased.", context, "en") == (
+        "Sales increased."
+    )
 
 
 def test_http_response_has_only_one_data_payload() -> None:

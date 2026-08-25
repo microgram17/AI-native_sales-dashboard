@@ -1,7 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 const TOKEN_STORAGE_KEY = 'retail_bi_access_token'
-const LEGACY_TOKEN_STORAGE_KEY = 'agent_token'
 
 export const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized'
 
@@ -12,9 +11,6 @@ export function setAuthToken(token: string | null): void {
     } else {
       localStorage.removeItem(TOKEN_STORAGE_KEY)
     }
-
-    // The old frontend used this key for manually generated dev tokens.
-    localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY)
   } catch {
     // localStorage unavailable (SSR/tests) — ignore.
   }

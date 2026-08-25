@@ -3,12 +3,12 @@
 The supplier identity is NEVER a model-visible tool argument. For authenticated
 requests it is extracted from a short-lived JWT that the backend mints after it
 resolves the trusted supplier membership, sent as ``Authorization: Bearer``.
-
-A development-only fallback (MCP_DEV_SUPPLIER_ID) applies solely when
-ENVIRONMENT=development and no Authorization token is supplied.
+Every environment requires this authenticated context.
 """
 
 from __future__ import annotations
+
+from typing import Protocol
 
 import jwt
 from mcp.server.fastmcp import Context
@@ -18,6 +18,12 @@ from app.db.engine import get_settings
 
 class SupplierContextError(Exception):
     """Raised when a trusted supplier context cannot be established."""
+
+
+class SupplierResolver(Protocol):
+    """Trusted supplier source used by MCP tool registration."""
+
+    def resolve(self, ctx: Context) -> str: ...
 
 
 def _bearer_token(ctx: Context) -> str | None:
@@ -44,15 +50,11 @@ class SupplierContextResolver:
     def __init__(
         self,
         *,
-        environment: str,
-        dev_supplier_id: str | None,
         jwt_secret: str,
         jwt_algorithm: str = "HS256",
         jwt_issuer: str | None = None,
         jwt_audience: str | None = None,
     ) -> None:
-        self._environment = environment
-        self._dev_supplier_id = dev_supplier_id
         self._jwt_secret = jwt_secret
         self._jwt_algorithm = jwt_algorithm
         self._jwt_issuer = jwt_issuer
@@ -63,12 +65,9 @@ class SupplierContextResolver:
         if token is not None:
             return self._supplier_from_token(token)
 
-        # No token: development fallback only.
-        if self._environment == "development" and self._dev_supplier_id:
-            return self._dev_supplier_id
         raise SupplierContextError(
             "No authenticated supplier context. A valid Authorization: Bearer "
-            "token is required outside development."
+            "token is required."
         )
 
     def _supplier_from_token(self, token: str) -> str:
@@ -94,8 +93,6 @@ class SupplierContextResolver:
 def build_supplier_context_resolver() -> SupplierContextResolver:
     settings = get_settings()
     return SupplierContextResolver(
-        environment=settings.environment,
-        dev_supplier_id=settings.mcp_dev_supplier_id,
         jwt_secret=settings.mcp_jwt_secret,
         jwt_algorithm=settings.mcp_jwt_algorithm,
         jwt_issuer=settings.mcp_jwt_issuer,

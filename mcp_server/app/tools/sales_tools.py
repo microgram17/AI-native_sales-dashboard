@@ -15,7 +15,7 @@ from typing import Annotated, TypeVar
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 
-from app.context.supplier_context import SupplierContextError, SupplierContextResolver
+from app.context.supplier_context import SupplierContextError, SupplierResolver
 from app.contracts.sales import (
     AnalyticsResult,
     GroupBy,
@@ -61,7 +61,7 @@ async def _run(coro: Awaitable[T]) -> T:
 def register_sales_tools(
     mcp: FastMCP,
     service: SalesAnalyticsService,
-    supplier_resolver: SupplierContextResolver,
+    supplier_resolver: SupplierResolver,
 ) -> None:
     @mcp.tool()
     async def resolve_product(
@@ -166,7 +166,9 @@ def register_sales_tools(
         - group_by: entity dimension to rank.
         - rank_by: additive metric to rank by (units, net_sales, gross_sales,
           orders, discounts). Averages and rates cannot be ranked but are still
-          returned per row as supporting metrics.
+          returned per row as supporting metrics. For an ambiguous best/worst
+          request that names no metric, use net_sales. Explicit unit wording
+          such as "most units" or "flest enheter" uses units.
         - order: "highest" (default) ranks descending; "lowest" ranks ascending
           (worst performers first). Ranks are always numbered 1, 2, 3 in the
           returned display order.

@@ -16,8 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 Channel = Literal["online", "physical"]
 GroupBy = Literal["product", "category", "store", "city", "channel"]
-SplitBy = Literal["product", "category", "store", "city", "channel"]
-EntityType = Literal["product", "category", "store", "city", "channel"]
+SplitBy = GroupBy
+EntityType = GroupBy
 # Only additive metrics can be ranked; averages/rates remain supporting metrics.
 RankBy = Literal[
     "units",
@@ -48,6 +48,8 @@ DataFieldFormat = Literal[
 class SalesScope(BaseModel):
     """Optional filters applied to a sales query. An empty list means no
     restriction on that dimension (e.g. empty ``channels`` = all channels)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     channels: list[Channel] = Field(
         default_factory=list,
@@ -101,6 +103,8 @@ class ProductOverviewScope(BaseModel):
 class EffectivePeriod(BaseModel):
     """The date range actually used by a query."""
 
+    model_config = ConfigDict(extra="forbid")
+
     start: date
     end: date
     label: str | None = None
@@ -113,6 +117,8 @@ class EffectivePeriod(BaseModel):
 
 class AnalyticsEntity(BaseModel):
     """A business entity a metric snapshot describes."""
+
+    model_config = ConfigDict(extra="forbid")
 
     type: EntityType
     id: str | None = None

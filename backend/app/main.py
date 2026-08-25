@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+from app.api.dependencies import close_agent_service
+from app.api.routes import agent, auth, dashboard, health
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import agent, auth, health, dashboard
-from app.api.dependencies import close_agent_service
 
 
 @asynccontextmanager

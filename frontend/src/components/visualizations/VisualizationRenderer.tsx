@@ -3,10 +3,8 @@ import type {
   AnalyticsContext,
   DataView,
   DisplaySelection,
-  VisualizationDataset,
   VisualizationSpec,
 } from '../../types/agent'
-import { findDataset } from '../../lib/datasetResolver'
 import { MetricCardsVisualization } from './MetricCardsVisualization'
 import { BarChartVisualization } from './BarChartVisualization'
 import { LineChartVisualization } from './LineChartVisualization'
@@ -40,21 +38,17 @@ export function VisualizationRenderer({
     if (!view) return []
     return [{
       spec: displayToSpec(display, view, language),
-      dataset: {
-        ...view,
-        source_call_id: '',
-        view: view.id,
-      } satisfies VisualizationDataset,
+      dataView: view,
     }]
   })
 
   return (
     <div className="visualization-list">
-      {cards.map(({ spec, dataset }, i) => (
+      {cards.map(({ spec, dataView }, i) => (
         <VisualizationCard
-          key={`${spec.dataset}-${i}`}
+          key={`${spec.view_id}-${i}`}
           spec={spec}
-          datasets={[dataset]}
+          dataView={dataView}
           dataContext={dataContext}
         />
       ))}
@@ -78,7 +72,7 @@ function displayToSpec(
 
   if (display.render_as === 'table') {
     return {
-      dataset: view.id,
+      view_id: view.id,
       type: 'table',
       title,
       y_keys: [],
@@ -88,7 +82,7 @@ function displayToSpec(
 
   if (view.kind === 'metrics') {
     return {
-      dataset: view.id,
+      view_id: view.id,
       type: 'metric_cards',
       title,
       y_keys: yKeys,
@@ -104,7 +98,7 @@ function displayToSpec(
 
   if (view.kind === 'categorical' || view.kind === 'timeseries') {
     return {
-      dataset: view.id,
+      view_id: view.id,
       type: view.kind === 'timeseries' ? 'line_chart' : 'bar_chart',
       title,
       x_key: view.primary_dimension,
@@ -117,7 +111,7 @@ function displayToSpec(
   }
 
   return {
-    dataset: view.id,
+    view_id: view.id,
     type: 'table',
     title,
     y_keys: [],
@@ -127,28 +121,27 @@ function displayToSpec(
 
 function VisualizationCard({
   spec,
-  datasets,
+  dataView,
   dataContext,
 }: {
   spec: VisualizationSpec
-  datasets: VisualizationDataset[]
+  dataView: DataView
   dataContext?: AnalyticsContext | null
 }) {
-  const dataset = findDataset(datasets, spec.dataset)
   const { language, t } = useTranslation()
   const targetRef = useRef<HTMLDivElement>(null)
+  const rankingMetric =
+    dataContext?.operation === 'ranking' && dataContext.rank_by
+      ? dataContext.rank_by
+      : null
 
-  const selectableMetrics = dataset
-    ? Array.from(new Set(spec.selectable_y_keys ?? [])).filter(
-        (key) => numericMetricExists(dataset, key),
-      )
-    : []
+  const selectableMetrics = Array.from(new Set(spec.selectable_y_keys ?? [])).filter(
+    (key) => numericMetricExists(dataView, key),
+  )
 
-  const requestedMetrics = dataset
-    ? spec.y_keys.filter((key) =>
-        numericMetricExists(dataset, key),
-      )
-    : []
+  const requestedMetrics = spec.y_keys.filter((key) =>
+    numericMetricExists(dataView, key),
+  )
 
   const hasRequestedMetricCombination =
     requestedMetrics.length > 1
@@ -187,16 +180,12 @@ function VisualizationCard({
           secondary_y_keys: [],
         }
 
-  const exportColumns = dataset
-    ? getVisualizationExportColumns(
-        effectiveSpec,
-        dataset,
-        language,
-      )
-    : []
-  const exportFilters = dataset
-    ? getContextFilters(dataContext, language)
-    : []
+  const exportColumns = getVisualizationExportColumns(
+    effectiveSpec,
+    dataView,
+    language,
+  )
+  const exportFilters = getContextFilters(dataContext, language)
 
   return (
     <div
@@ -208,16 +197,21 @@ function VisualizationCard({
           {spec.title}
         </div>
 
-        {dataset && (
-          <ExportMenu
-            targetRef={targetRef}
-            title={spec.title}
-            rows={dataset.rows}
-            columns={exportColumns}
-            filters={exportFilters}
-          />
-        )}
+        <ExportMenu
+          targetRef={targetRef}
+          title={spec.title}
+          rows={dataView.rows}
+          columns={exportColumns}
+          filters={exportFilters}
+        />
       </div>
+
+      {rankingMetric && (
+        <div className="visualization-ranking-basis">
+          <span>{t.rankedBy}:</span>
+          <strong>{visualizationFieldLabel(language, rankingMetric)}</strong>
+        </div>
+      )}
 
       {hasMetricSelector && (
         <div
@@ -273,14 +267,11 @@ function VisualizationCard({
       )}
 
       <VizBoundary fallbackText={t.vizRenderError}>
-        {!dataset ? (
-          <FallbackNote text={t.vizMissingDataset(spec.dataset)} />
-        ) : (
-          <VisualizationBody
-            spec={effectiveSpec}
-            dataset={dataset}
-          />
-        )}
+        <VisualizationBody
+          spec={effectiveSpec}
+          dataView={dataView}
+          highlightedMetric={rankingMetric}
+        />
       </VizBoundary>
     </div>
   )
@@ -288,10 +279,10 @@ function VisualizationCard({
 
 
 function numericMetricExists(
-  dataset: VisualizationDataset,
+  dataView: DataView,
   key: string,
 ): boolean {
-  const values = dataset.rows
+  const values = dataView.rows
     .map((row) => row[key])
     .filter((value) => value != null)
 
@@ -308,10 +299,10 @@ function numericMetricExists(
 
 function getVisualizationExportColumns(
   spec: VisualizationSpec,
-  dataset: VisualizationDataset,
+  dataView: DataView,
   language: 'en' | 'sv',
 ): ExportColumn[] {
-  const firstRow = dataset.rows[0] ?? {}
+  const firstRow = dataView.rows[0] ?? {}
 
   let keys: string[]
 
@@ -338,7 +329,7 @@ function getVisualizationExportColumns(
 
   return Array.from(new Set(keys))
     .filter((key) =>
-      dataset.rows.some((row) => Object.prototype.hasOwnProperty.call(row, key)),
+      dataView.rows.some((row) => Object.prototype.hasOwnProperty.call(row, key)),
     )
     .map((key) => ({
       key,
@@ -393,38 +384,41 @@ function translateFilterValue(
 
 function VisualizationBody({
   spec,
-  dataset,
+  dataView,
+  highlightedMetric,
 }: {
   spec: VisualizationSpec
-  dataset: VisualizationDataset
+  dataView: DataView
+  highlightedMetric?: string | null
 }) {
   switch (spec.type) {
     case 'metric_cards':
       return (
         <MetricCardsVisualization
           spec={spec}
-          dataset={dataset}
+          dataView={dataView}
+          highlightedMetric={highlightedMetric}
         />
       )
     case 'bar_chart':
       return (
         <BarChartVisualization
           spec={spec}
-          dataset={dataset}
+          dataView={dataView}
         />
       )
     case 'line_chart':
       return (
         <LineChartVisualization
           spec={spec}
-          dataset={dataset}
+          dataView={dataView}
         />
       )
     case 'table':
       return (
         <TableVisualization
           spec={spec}
-          dataset={dataset}
+          dataView={dataView}
         />
       )
     default:

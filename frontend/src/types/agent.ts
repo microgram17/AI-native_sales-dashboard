@@ -1,4 +1,19 @@
-export type UiLanguage = 'en' | 'sv'
+type UiLanguage = 'en' | 'sv'
+type Grain = 'day' | 'week' | 'month' | 'quarter'
+type GroupBy = 'product' | 'category' | 'store' | 'city' | 'channel'
+type Metric =
+  | RankMetric
+  | 'average_selling_price'
+  | 'discount_rate'
+
+type RankMetric =
+  | 'units'
+  | 'net_sales'
+  | 'gross_sales'
+  | 'discounts'
+  | 'orders'
+
+type EntityType = 'product' | 'category' | 'store' | 'city' | 'channel'
 
 export type DataFieldFormat =
   | 'text'
@@ -8,7 +23,7 @@ export type DataFieldFormat =
   | 'currency_sek'
   | 'percentage_fraction'
 
-export interface DataField {
+interface DataField {
   key: string
   role: 'dimension' | 'measure'
   format: DataFieldFormat
@@ -25,7 +40,7 @@ export interface DataView {
   default_visible: boolean
 }
 
-export interface EffectivePeriod {
+interface EffectivePeriod {
   start: string
   end: string
   label?: string | null
@@ -35,13 +50,13 @@ export interface EffectivePeriod {
 export interface AnalyticsContext {
   operation: 'summary' | 'ranking' | 'trend' | 'product_overview'
   effective_period: EffectivePeriod
-  effective_scope: WidgetAnalysisScope & { product_ids?: string[] }
-  grain?: 'day' | 'week' | 'month' | 'quarter' | null
-  group_by?: 'product' | 'category' | 'store' | 'city' | 'channel' | null
-  rank_by?: string | null
+  effective_scope: AnalyticsScope
+  grain?: Grain | null
+  group_by?: GroupBy | null
+  rank_by?: RankMetric | null
   order?: 'highest' | 'lowest' | null
-  split_by?: 'product' | 'category' | 'store' | 'city' | 'channel' | null
-  entity?: { type: string; id?: string | null; name: string } | null
+  split_by?: GroupBy | null
+  entity?: { type: EntityType; id?: string | null; name: string } | null
 }
 
 export interface DisplaySelection {
@@ -62,30 +77,38 @@ export interface ToolCallInfo {
 export interface DashboardChatContext {
   date_from: string
   date_to: string
-  metric?: string
-  grain?: string
-  group_by?: string
-  view?: string
+  metric?: Metric
+  grain?: Grain
+  group_by?: GroupBy
+  view?: 'ranking' | 'trend'
   selected_group_ids?: string[]
 }
 
-export interface WidgetAnalysisScope {
+interface WidgetAnalysisScope {
   channels?: Array<'online' | 'physical'>
   cities?: string[]
   store_ids?: string[]
   categories?: string[]
 }
 
+interface AnalyticsScope {
+  channels: Array<'online' | 'physical'>
+  cities: string[]
+  store_ids: string[]
+  categories: string[]
+  product_ids: string[]
+}
+
 export interface WidgetAnalysisRequest {
   widget: 'kpi' | 'sales_trend' | 'performance'
   operation: 'summary' | 'trend' | 'ranking'
-  metrics: string[]
+  metrics: Metric[]
   period_start: string
   period_end: string
-  grain?: 'day' | 'week' | 'month' | 'quarter'
-  group_by?: 'product' | 'category' | 'store' | 'city' | 'channel'
-  rank_by?: 'units' | 'net_sales' | 'gross_sales' | 'discounts' | 'orders'
-  split_by?: 'product' | 'category' | 'store' | 'city' | 'channel'
+  grain?: Grain
+  group_by?: GroupBy
+  rank_by?: RankMetric
+  split_by?: GroupBy
   limit?: number
   series_limit?: number
   scope?: WidgetAnalysisScope
@@ -118,11 +141,11 @@ export interface ChatEntry {
   toolCalls?: ToolCallInfo[]
 }
 
-// Internal renderer adapter contracts. These are not part of the HTTP API.
-export type VisualizationType = 'metric_cards' | 'bar_chart' | 'line_chart' | 'table'
+// Internal renderer presentation contract. This is not part of the HTTP API.
+type VisualizationType = 'metric_cards' | 'bar_chart' | 'line_chart' | 'table'
 
 export interface VisualizationSpec {
-  dataset: string
+  view_id: string
   type: VisualizationType
   title: string
   x_key?: string | null
@@ -131,9 +154,4 @@ export interface VisualizationSpec {
   selectable_y_keys?: string[]
   series_key?: string | null
   columns: string[]
-}
-
-export interface VisualizationDataset extends DataView {
-  source_call_id: string
-  view: string
 }

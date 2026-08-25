@@ -58,11 +58,14 @@ def test_supplier_id_is_not_accepted_from_request_body():
     response = client.post(
         "/agent/query", json={"message": "hi", "supplier_id": "HACKED"}
     )
-    assert response.status_code == 200
-    # supplier came from the trusted context, not the body.
-    assert fake.seen_context.supplier_id == "NORDVALE"
-    assert not hasattr(fake.seen_request, "supplier_id")
-    assert response.json()["message"] == "supplier=NORDVALE"
+    assert response.status_code == 422
+    assert fake.seen_context is None
+
+
+def test_only_canonical_agent_query_route_is_published():
+    paths = app.openapi()["paths"]
+    assert "/agent/query" in paths
+    assert "/agent/query-v2" not in paths
 
 
 def test_dashboard_context_is_accepted_without_affecting_supplier_scope():

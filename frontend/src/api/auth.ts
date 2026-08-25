@@ -1,6 +1,6 @@
 import { apiFetch } from './client'
 
-export type AccountType = 'supplier' | 'retailer_admin'
+type AccountType = 'supplier' | 'retailer_admin'
 
 export interface LoginRequest {
   email: string

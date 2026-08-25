@@ -455,8 +455,7 @@ def generate_orders_and_items(
     # Only active products are sold
     products_list = products_df[products_df["active"]].to_dict("records")
 
-    store_ids    = [row["store_id"] for row in STORE_ROWS]
-    base_weights = [STORE_BASE_WEIGHTS[sid] for sid in store_ids]
+    store_ids = [row["store_id"] for row in STORE_ROWS]
 
     order_rows: list[dict] = []
     item_rows:  list[dict] = []

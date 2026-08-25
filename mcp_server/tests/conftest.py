@@ -10,7 +10,7 @@ from app.db.windows_asyncio import configure_windows_event_loop
 
 configure_windows_event_loop()
 
-from app.context.supplier_context import SupplierContextResolver
+from app.context.supplier_context import SupplierResolver
 from app.db.engine import get_settings
 from app.repositories.sales_analytics_repository import SalesAnalyticsRepository
 from app.services.sales_analytics_service import SalesAnalyticsService
@@ -44,14 +44,14 @@ def service(repository) -> SalesAnalyticsService:
 
 
 @pytest.fixture
-def resolver() -> SupplierContextResolver:
-    return SupplierContextResolver(
-        environment="development",
-        dev_supplier_id=SUPPLIER,
-        jwt_secret=JWT_SECRET,
-        jwt_issuer=JWT_ISSUER,
-        jwt_audience=JWT_AUDIENCE,
-    )
+def resolver() -> SupplierResolver:
+    class TestSupplierResolver:
+        """Fixed supplier context for direct, in-process tool contract tests."""
+
+        def resolve(self, _ctx) -> str:
+            return SUPPLIER
+
+    return TestSupplierResolver()
 
 
 @pytest.fixture

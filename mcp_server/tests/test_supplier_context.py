@@ -40,10 +40,8 @@ def _token(
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
-def _resolver(*, environment: str = "development", dev_supplier_id: str | None = SUPPLIER):
+def _resolver():
     return SupplierContextResolver(
-        environment=environment,
-        dev_supplier_id=dev_supplier_id,
         jwt_secret=JWT_SECRET,
         jwt_issuer=JWT_ISSUER,
         jwt_audience=JWT_AUDIENCE,
@@ -81,13 +79,8 @@ def test_wrong_audience_rejected():
         resolver.resolve(_ctx(f"Bearer {_token(audience='evil')}"))
 
 
-def test_dev_fallback_only_without_token_in_development():
-    resolver = _resolver(environment="development", dev_supplier_id=SUPPLIER)
-    assert resolver.resolve(_ctx(None)) == SUPPLIER
-
-
-def test_production_without_authentication_fails():
-    resolver = _resolver(environment="production", dev_supplier_id=SUPPLIER)
+def test_missing_authentication_fails():
+    resolver = _resolver()
     with pytest.raises(SupplierContextError):
         resolver.resolve(_ctx(None))
 

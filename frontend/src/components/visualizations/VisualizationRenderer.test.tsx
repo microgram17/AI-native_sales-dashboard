@@ -1,7 +1,12 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LanguageProvider } from '../../i18n/LanguageContext'
-import type { DataView, DisplaySelection } from '../../types/agent'
+import { translations } from '../../i18n/translations'
+import type {
+  AnalyticsContext,
+  DataView,
+  DisplaySelection,
+} from '../../types/agent'
 import { VisualizationRenderer } from './VisualizationRenderer'
 
 afterEach(cleanup)
@@ -39,10 +44,38 @@ const trend: DataView = {
   default_visible: true,
 }
 
-function renderView(display: DisplaySelection, view: DataView) {
+const rankingContext: AnalyticsContext = {
+  operation: 'ranking',
+  effective_period: {
+    start: '2026-01-01',
+    end: '2026-12-31',
+    label: '2026',
+    defaulted: false,
+  },
+  effective_scope: {
+    channels: [],
+    cities: [],
+    store_ids: [],
+    categories: [],
+    product_ids: [],
+  },
+  group_by: 'product',
+  rank_by: 'net_sales',
+  order: 'highest',
+}
+
+function renderView(
+  display: DisplaySelection,
+  view: DataView,
+  dataContext?: AnalyticsContext,
+) {
   return render(
     <LanguageProvider>
-      <VisualizationRenderer displays={[display]} dataViews={[view]} />
+      <VisualizationRenderer
+        displays={[display]}
+        dataViews={[view]}
+        dataContext={dataContext}
+      />
     </LanguageProvider>,
   )
 }
@@ -63,11 +96,17 @@ describe('VisualizationRenderer', () => {
         title: 'Best product',
       },
       singleRanking,
+      rankingContext,
     )
 
     expect(screen.getByText('Best product')).toBeInTheDocument()
     expect(screen.getByText('Hoodie')).toBeInTheDocument()
-    expect(container.querySelectorAll('.visualization-metric-card')).toHaveLength(2)
+    expect(screen.getByText('Rangordnad efter:')).toBeInTheDocument()
+    expect(screen.getByText('Rankningsmått')).toBeInTheDocument()
+    const cards = container.querySelectorAll('.visualization-metric-card')
+    expect(cards).toHaveLength(2)
+    expect(cards[0]).toHaveClass('is-ranking-metric')
+    expect(cards[0]).toHaveTextContent('Nettoomsättning')
   })
 
   it('maps categorical views to a bar chart', () => {
@@ -79,9 +118,22 @@ describe('VisualizationRenderer', () => {
         title: 'Top products',
       },
       ranking,
+      {
+        ...rankingContext,
+        rank_by: 'units',
+      },
     )
     expect(screen.getByText('Top products')).toBeInTheDocument()
+    expect(screen.getByText('Rangordnad efter:')).toBeInTheDocument()
+    expect(screen.getByText('Sålda enheter')).toBeInTheDocument()
     expect(screen.queryByText('No valid data to chart.')).not.toBeInTheDocument()
+  })
+
+  it('provides English and Swedish ranking labels', () => {
+    expect(translations.en.rankedBy).toBe('Ranked by')
+    expect(translations.en.rankingMetric).toBe('Ranking metric')
+    expect(translations.sv.rankedBy).toBe('Rangordnad efter')
+    expect(translations.sv.rankingMetric).toBe('Rankningsmått')
   })
 
   it('maps timeseries views to a line chart', () => {

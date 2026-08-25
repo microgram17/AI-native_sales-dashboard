@@ -10,15 +10,15 @@ import {
 } from 'recharts'
 import type {
   DataFieldFormat,
-  VisualizationDataset,
+  DataView,
   VisualizationSpec,
 } from '../../types/agent'
 import {
-  datasetToRows,
+  dataViewToRows,
   fieldExists,
   numericFieldExists,
   resolveField,
-} from '../../lib/datasetResolver'
+} from '../../lib/dataView'
 import {
   COLORS,
   formatShortNumber,
@@ -34,33 +34,16 @@ import {
 
 interface Props {
   spec: VisualizationSpec
-  dataset: VisualizationDataset
+  dataView: DataView
 }
 
 const PRIMARY_AXIS_ID = 'primary'
 const SECONDARY_AXIS_ID = 'secondary'
 
-function isRateKey(key: string): boolean {
-  return /(rate|share|percent)/.test(
-    key.toLowerCase(),
-  )
-}
-
-function isMonetaryKey(key: string): boolean {
-  const normalized = key.toLowerCase()
-
-  return (
-    /(sales|revenue|discount|price|sek|cost)/.test(
-      normalized,
-    ) && !isRateKey(normalized)
-  )
-}
-
 function formatAxisTick(
-  metricKey: string,
   value: unknown,
   language: Language,
-  format?: DataFieldFormat,
+  format: DataFieldFormat,
 ): string {
   if (
     typeof value !== 'number' ||
@@ -69,17 +52,12 @@ function formatAxisTick(
     return String(value ?? '')
   }
 
-  if (format === 'percentage_fraction' || (!format && isRateKey(metricKey))) {
-    const percentage =
-      format === 'percentage_fraction'
-        ? value * 100
-        : Math.abs(value) <= 1 ? value * 100 : value
-
+  if (format === 'percentage_fraction') {
     const locale = language === 'sv' ? 'sv-SE' : 'en-SE'
 
     return `${new Intl.NumberFormat(locale, {
       maximumFractionDigits: 1,
-    }).format(percentage)}%`
+    }).format(value * 100)}%`
   }
 
   return formatShortNumber(value)
@@ -88,23 +66,26 @@ function formatAxisTick(
 function axisLabel(
   keys: string[],
   language: Language,
+  dataView: DataView,
 ): string {
   if (keys.length === 0) return ''
 
   if (keys.length === 1) {
     const key = keys[0]
     const label = visualizationFieldLabel(language, key)
-
-    return isMonetaryKey(key)
+    return dataView.fields.find((field) => field.key === key)?.format === 'currency_sek'
       ? `${label} (SEK)`
-      : label
+      : visualizationFieldLabel(language, key)
   }
 
-  if (keys.every(isMonetaryKey)) {
+  const formats = keys.map((key) =>
+    dataView.fields.find((field) => field.key === key)?.format,
+  )
+  if (formats.every((format) => format === 'currency_sek')) {
     return 'SEK'
   }
 
-  if (keys.every(isRateKey)) {
+  if (formats.every((format) => format === 'percentage_fraction')) {
     return language === 'sv' ? 'Procent' : 'Percent'
   }
 
@@ -124,10 +105,10 @@ const axisLine = {
 
 export function LineChartVisualization({
   spec,
-  dataset,
+  dataView,
 }: Props) {
   const { language, t } = useTranslation()
-  const rows = datasetToRows(dataset)
+  const rows = dataViewToRows(dataView)
   const xKey = spec.x_key ?? null
   const valueKeys = spec.y_keys
 
@@ -205,10 +186,9 @@ export function LineChartVisualization({
           <YAxis
             tickFormatter={(value) =>
               formatAxisTick(
-                metricKey,
                 value,
                 language,
-                dataset.fields.find((field) => field.key === metricKey)?.format,
+                dataView.fields.find((field) => field.key === metricKey)?.format ?? 'decimal',
               )
             }
             tick={axisTick}
@@ -219,9 +199,8 @@ export function LineChartVisualization({
           <Tooltip
             formatter={(value, name) => [
               formatMetricValue(
-                metricKey,
                 value,
-                dataset.fields.find((field) => field.key === metricKey)?.format,
+                dataView.fields.find((field) => field.key === metricKey)?.format ?? 'decimal',
               ),
               String(name),
             ]}
@@ -326,10 +305,9 @@ export function LineChartVisualization({
           orientation="left"
           tickFormatter={(value) =>
             formatAxisTick(
-              primaryMetricKey,
               value,
               language,
-              dataset.fields.find((field) => field.key === primaryMetricKey)?.format,
+              dataView.fields.find((field) => field.key === primaryMetricKey)?.format ?? 'decimal',
             )
           }
           tick={axisTick}
@@ -340,7 +318,7 @@ export function LineChartVisualization({
             isDualAxis
               ? {
                   value:
-                    axisLabel(primaryKeys, language),
+                    axisLabel(primaryKeys, language, dataView),
                   angle: -90,
                   position: 'insideLeft',
                   style: {
@@ -359,10 +337,9 @@ export function LineChartVisualization({
               orientation="right"
               tickFormatter={(value) =>
                 formatAxisTick(
-                  secondaryMetricKey,
                   value,
                   language,
-                  dataset.fields.find((field) => field.key === secondaryMetricKey)?.format,
+                  dataView.fields.find((field) => field.key === secondaryMetricKey)?.format ?? 'decimal',
                 )
               }
               tick={axisTick}
@@ -371,7 +348,7 @@ export function LineChartVisualization({
               width={68}
               label={{
                 value:
-                  axisLabel(secondaryKeys, language),
+                  axisLabel(secondaryKeys, language, dataView),
                 angle: 90,
                 position: 'insideRight',
                 style: {
@@ -385,9 +362,8 @@ export function LineChartVisualization({
         <Tooltip
           formatter={(value, name) => [
             formatMetricValue(
-              String(name),
               value,
-              dataset.fields.find((field) => field.key === String(name))?.format,
+              dataView.fields.find((field) => field.key === String(name))?.format ?? 'decimal',
             ),
             visualizationFieldLabel(language, String(name)),
           ]}

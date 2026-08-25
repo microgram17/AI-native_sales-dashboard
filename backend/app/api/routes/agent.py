@@ -10,7 +10,6 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 
 @router.post("/query", response_model=AgentQueryResponse)
-@router.post("/query-v2", response_model=AgentQueryResponse)
 async def query(
     request: AgentQueryRequest,
     context: RequestContextDep,

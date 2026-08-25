@@ -1,16 +1,9 @@
-import type { VisualizationDataset } from '../types/agent'
+import type { DataView } from '../types/agent'
 
 export type Row = Record<string, unknown>
 
-export function findDataset(
-  datasets: VisualizationDataset[],
-  ref: string,
-): VisualizationDataset | undefined {
-  return datasets.find((dataset) => dataset.id === ref)
-}
-
-export function datasetToRows(dataset: VisualizationDataset | undefined): Row[] {
-  return dataset?.rows ?? []
+export function dataViewToRows(dataView: DataView): Row[] {
+  return dataView.rows
 }
 
 export function resolveField(

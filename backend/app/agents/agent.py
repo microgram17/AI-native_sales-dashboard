@@ -16,6 +16,7 @@ from app.schemas.agent import AgentTurnOutput
 
 MCP_TOKEN = "mcp_token"
 TURN_TOOL_CALLS = "turn_tool_calls"
+TURN_ANALYTICS_RESERVED = "turn_analytics_reserved"
 TURN_ANALYTICS_CALLED = "turn_analytics_called"
 TURN_ANALYTICS_RESULT = "turn_analytics_result"
 LAST_ANALYTICS_RESULT = "last_analytics_result"
@@ -46,14 +47,24 @@ Rules:
   supplied by trusted server authentication.
 - For an analytics question, make exactly one analytics call. You may first use
   resolve_product when another analytics tool requires a canonical product ID.
+- Once an analytics tool returns, stop calling tools and produce the final
+  response. Never call analytics tools in parallel. A request about how one
+  named product is doing uses product_overview directly; do not combine
+  product_overview with resolve_product or another analytics tool.
 - Resolve relative dates from the current date. Explicit user wording overrides
   dashboard context. A widget analysis request is authoritative for its period,
   metrics, grouping, grain, and scope.
 - Conversation history supplies follow-up context. For a modifier such as
-  "same, but online", call the correct analytics tool with the complete updated
-  arguments.
+  "same, but online" or "and in Stockholm", always make a new analytics call
+  with the complete updated arguments. Reuse the same named product, period,
+  metric, and other filters unless the user changes them.
+- When the user compares members of a dimension over time, use one sales_trend
+  call with split_by (for example split_by="channel" for online versus
+  physical). Do not make one filtered call per member.
 - For a presentation-only follow-up such as "show that as a table", do not call
-  an analytics tool. Select reusable view IDs and set render_as="table".
+  an analytics tool. Select reusable view IDs and set render_as="table". Only
+  explicit presentation changes may reuse views; scope, period, metric, grain,
+  ranking, and entity changes require fresh analytics.
 - Use only facts present in tool results. Do not invent data or claim causes.
   If asked why, say the descriptive sales data cannot establish causation and
   give only a short grounded observation.
@@ -88,6 +99,31 @@ def _structured_content(response: Any) -> dict[str, Any] | None:
     return None
 
 
+def enforce_tool_budget(
+    tool: BaseTool,
+    args: dict[str, Any],
+    tool_context: ToolContext,
+) -> dict[str, Any] | None:
+    """Prevent execution of any tool after this turn's analytics call."""
+
+    del args
+    blocked = tool_context.state.get(TURN_ANALYTICS_CALLED) or (
+        tool.name in _ANALYTICS_TOOLS
+        and tool_context.state.get(TURN_ANALYTICS_RESERVED)
+    )
+    if blocked:
+        return {
+            "isError": True,
+            "error": "The analytics call limit for this turn has been reached.",
+            "_blocked_by_tool_budget": True,
+        }
+    if tool.name in _ANALYTICS_TOOLS:
+        # Reserve before execution so parallel calls from one model response
+        # cannot both reach MCP before the first callback captures its result.
+        tool_context.state[TURN_ANALYTICS_RESERVED] = True
+    return None
+
+
 def capture_tool_result(
     tool: BaseTool,
     args: dict[str, Any],
@@ -95,6 +131,9 @@ def capture_tool_result(
     tool_response: dict[str, Any],
 ) -> None:
     """Capture MCP metadata and semantic views without rewriting their rows."""
+
+    if tool_response.get("_blocked_by_tool_budget"):
+        return
 
     structured = _structured_content(tool_response)
     is_error = bool(tool_response.get("isError") or tool_response.get("is_error"))
@@ -133,7 +172,9 @@ def build_sales_agent(
 ) -> tuple[LlmAgent, McpToolset]:
     toolset = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
-            url=mcp_server_url.rstrip("/") + "/",
+            # FastMCP mounts its canonical endpoint without a trailing slash.
+            # Avoid a redirect so per-request Authorization is preserved.
+            url=mcp_server_url.rstrip("/"),
         ),
         tool_filter=[
             "resolve_product",
@@ -151,6 +192,7 @@ def build_sales_agent(
         tools=[toolset],
         output_schema=AgentTurnOutput,
         output_key="agent_turn_output",
+        before_tool_callback=enforce_tool_budget,
         after_tool_callback=capture_tool_result,
     )
     return agent, toolset

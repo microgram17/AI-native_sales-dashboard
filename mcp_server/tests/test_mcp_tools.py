@@ -52,6 +52,15 @@ async def test_scope_is_a_nested_object_in_schema(mcp_server):
     assert {"channels", "cities", "store_ids", "categories", "product_ids"} <= set(
         scope_props
     )
+    assert defs["SalesScope"]["additionalProperties"] is False
+
+
+async def test_supplier_id_is_rejected_inside_scope(mcp_server):
+    with pytest.raises(Exception):
+        await mcp_server.call_tool(
+            "sales_summary",
+            {"scope": {"supplier_id": "HACKED"}},
+        )
 
 
 # 17

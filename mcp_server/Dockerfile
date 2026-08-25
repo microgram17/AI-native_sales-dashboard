@@ -5,16 +5,15 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 ENV UV_LINK_MODE=copy
 
-RUN pip install --no-cache-dir uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.24 /uv /uvx /bin/
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv sync --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project
 
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY app ./app
-COPY scripts ./scripts
 
 EXPOSE 8000
 

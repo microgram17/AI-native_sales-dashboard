@@ -1,12 +1,12 @@
 import type {
-  VisualizationDataset,
+  DataView,
   VisualizationSpec,
 } from '../../types/agent'
 import {
-  datasetToRows,
+  dataViewToRows,
   fieldExists,
   resolveField,
-} from '../../lib/datasetResolver'
+} from '../../lib/dataView'
 import { formatMetricValue } from '../../lib/format'
 import { useTranslation } from '../../i18n/LanguageContext'
 import {
@@ -16,15 +16,15 @@ import {
 
 interface Props {
   spec: VisualizationSpec
-  dataset: VisualizationDataset
+  dataView: DataView
 }
 
 export function TableVisualization({
   spec,
-  dataset,
+  dataView,
 }: Props) {
   const { language, t } = useTranslation()
-  const rows = datasetToRows(dataset)
+  const rows = dataViewToRows(dataView)
 
   if (rows.length === 0) {
     return <Fallback text={t.vizNoRows} />
@@ -60,9 +60,8 @@ export function TableVisualization({
                 const display =
                   typeof value === 'number'
                     ? formatMetricValue(
-                        column,
                         value,
-                        dataset.fields.find((field) => field.key === column)?.format,
+                        dataView.fields.find((field) => field.key === column)?.format ?? 'decimal',
                       )
                     : String(
                         visualizationValueLabel(language, value) ?? '',

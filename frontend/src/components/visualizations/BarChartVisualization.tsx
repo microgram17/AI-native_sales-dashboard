@@ -9,15 +9,15 @@ import {
   Legend,
 } from 'recharts'
 import type {
-  VisualizationDataset,
+  DataView,
   VisualizationSpec,
 } from '../../types/agent'
 import {
-  datasetToRows,
+  dataViewToRows,
   fieldExists,
   numericFieldExists,
   resolveField,
-} from '../../lib/datasetResolver'
+} from '../../lib/dataView'
 import {
   COLORS,
 } from '../../features/dashboard/components/visualizationUtils'
@@ -30,15 +30,15 @@ import {
 
 interface Props {
   spec: VisualizationSpec
-  dataset: VisualizationDataset
+  dataView: DataView
 }
 
 export function BarChartVisualization({
   spec,
-  dataset,
+  dataView,
 }: Props) {
   const { language, t } = useTranslation()
-  const rows = datasetToRows(dataset)
+  const rows = dataViewToRows(dataView)
   const xKey = spec.x_key ?? null
   const valueKeys = spec.y_keys
 
@@ -68,11 +68,11 @@ export function BarChartVisualization({
 
     return item
   })
-  const primaryFormat = dataset.fields.find(
+  const primaryFormat = dataView.fields.find(
     (field) => field.key === valueKeys[0],
-  )?.format
+  )?.format ?? 'decimal'
   const formatTick = (value: unknown) =>
-    formatMetricValue(valueKeys[0], value, primaryFormat)
+    formatMetricValue(value, primaryFormat)
 
   const longestLabel = Math.max(
     ...data.map((item) =>
@@ -176,9 +176,8 @@ export function BarChartVisualization({
         <Tooltip
           formatter={(value, name) => [
             formatMetricValue(
-              String(name),
               value,
-              dataset.fields.find((field) => field.key === String(name))?.format,
+              dataView.fields.find((field) => field.key === String(name))?.format ?? 'decimal',
             ),
             visualizationFieldLabel(language, String(name)),
           ]}

@@ -637,7 +637,7 @@ export function DashboardPage() {
   }
 
   function summaryWidgetAnalysis(
-    metrics: string[],
+    metrics: Metric[],
   ): WidgetAnalysisRequest {
     return {
       widget: 'kpi',
