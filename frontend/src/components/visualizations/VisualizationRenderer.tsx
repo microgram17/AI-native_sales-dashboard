@@ -17,8 +17,6 @@ import {
   visualizationValueLabel,
 } from '../../i18n/translations'
 
-const REQUESTED_METRICS_OPTION = '__requested_metrics__'
-
 interface RendererProps {
   displays: DisplaySelection[]
   dataViews: DataView[]
@@ -91,11 +89,6 @@ function displayToSpec(
     }
   }
 
-  const primaryFormat = measureFields.find((field) => field.key === yKeys[0])?.format
-  const secondaryYKeys = yKeys.slice(1).filter((key) =>
-    measureFields.find((field) => field.key === key)?.format !== primaryFormat,
-  )
-
   if (view.kind === 'categorical' || view.kind === 'timeseries') {
     return {
       view_id: view.id,
@@ -103,7 +96,6 @@ function displayToSpec(
       title,
       x_key: view.primary_dimension,
       y_keys: yKeys,
-      secondary_y_keys: secondaryYKeys,
       selectable_y_keys: measureFields.map((field) => field.key),
       series_key: view.series_dimension,
       columns: [],
@@ -143,27 +135,17 @@ function VisualizationCard({
     numericMetricExists(dataView, key),
   )
 
-  const hasRequestedMetricCombination =
-    requestedMetrics.length > 1
-
-  const defaultSelection = hasRequestedMetricCombination
-    ? REQUESTED_METRICS_OPTION
-    : (
-        requestedMetrics[0] ??
-        selectableMetrics[0] ??
-        ''
-      )
+  const defaultSelection =
+    requestedMetrics[0] ??
+    selectableMetrics[0] ??
+    ''
 
   const [selectedMetric, setSelectedMetric] =
     useState(defaultSelection)
 
-  const effectiveSelection =
-    selectedMetric === REQUESTED_METRICS_OPTION &&
-    hasRequestedMetricCombination
-      ? REQUESTED_METRICS_OPTION
-      : selectableMetrics.includes(selectedMetric)
-        ? selectedMetric
-        : defaultSelection
+  const effectiveSelection = selectableMetrics.includes(selectedMetric)
+    ? selectedMetric
+    : defaultSelection
 
   const hasMetricSelector =
     spec.type === 'line_chart' &&
@@ -171,14 +153,12 @@ function VisualizationCard({
     !!effectiveSelection
 
   const effectiveSpec: VisualizationSpec =
-    !hasMetricSelector ||
-    effectiveSelection === REQUESTED_METRICS_OPTION
-      ? spec
-      : {
+    spec.type === 'line_chart' && effectiveSelection
+      ? {
           ...spec,
           y_keys: [effectiveSelection],
-          secondary_y_keys: [],
         }
+      : spec
 
   const exportColumns = getVisualizationExportColumns(
     effectiveSpec,
@@ -247,16 +227,6 @@ function VisualizationCard({
               cursor: 'pointer',
             }}
           >
-            {hasRequestedMetricCombination && (
-              <option value={REQUESTED_METRICS_OPTION}>
-                {requestedMetrics
-                  .map((metric) =>
-                    visualizationFieldLabel(language, metric),
-                  )
-                  .join(' + ')}
-              </option>
-            )}
-
             {selectableMetrics.map((metric) => (
               <option key={metric} value={metric}>
                 {visualizationFieldLabel(language, metric)}

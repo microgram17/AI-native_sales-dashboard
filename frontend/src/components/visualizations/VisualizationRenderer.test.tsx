@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LanguageProvider } from '../../i18n/LanguageContext'
 import { translations } from '../../i18n/translations'
@@ -147,6 +147,45 @@ describe('VisualizationRenderer', () => {
       trend,
     )
     expect(screen.getByText('Monthly sales')).toBeInTheDocument()
+  })
+
+  it('offers all requested trend measures but charts one at a time', () => {
+    const multiMeasureTrend: DataView = {
+      ...trend,
+      rows: [
+        { period_label: '2026-01', units: 10, net_sales: 1000 },
+        { period_label: '2026-02', units: 12, net_sales: 1200 },
+      ],
+      fields: [
+        { key: 'period_label', role: 'dimension', format: 'text' },
+        { key: 'units', role: 'measure', format: 'integer' },
+        { key: 'net_sales', role: 'measure', format: 'currency_sek' },
+      ],
+      default_measures: ['units'],
+    }
+
+    renderView(
+      {
+        view_id: 'trend',
+        render_as: 'default',
+        measure_keys: ['units', 'net_sales'],
+        title: 'Monthly sales',
+      },
+      multiMeasureTrend,
+    )
+
+    const picker = screen.getByRole('combobox') as HTMLSelectElement
+    const options = Array.from(picker.options)
+
+    expect(picker.value).toBe('units')
+    expect(options.map((option) => option.value)).toEqual([
+      'units',
+      'net_sales',
+    ])
+    expect(options.every((option) => !option.text.includes(' + '))).toBe(true)
+
+    fireEvent.change(picker, { target: { value: 'net_sales' } })
+    expect(picker.value).toBe('net_sales')
   })
 
   it('honors a table presentation override', () => {
