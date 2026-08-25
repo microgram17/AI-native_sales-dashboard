@@ -56,7 +56,12 @@ export interface AnalyticsContext {
   rank_by?: RankMetric | null
   order?: 'highest' | 'lowest' | null
   split_by?: GroupBy | null
-  entity?: { type: EntityType; id?: string | null; name: string } | null
+  entity?: {
+    type: EntityType
+    id?: string | null
+    name: string
+    category?: string | null
+  } | null
 }
 
 export interface DisplaySelection {

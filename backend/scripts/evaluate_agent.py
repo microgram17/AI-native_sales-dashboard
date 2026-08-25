@@ -30,6 +30,14 @@ def _contains(actual: Any, expected: Any) -> bool:
 
 
 def _turn_passed(payload: dict[str, Any], expected: dict[str, Any]) -> bool:
+    message = str(payload.get("message") or "")
+    has_markdown_table = any(
+        line.strip().startswith("|") and line.strip().endswith("|")
+        for line in message.splitlines()
+    )
+    if has_markdown_table:
+        return False
+
     expected_tool = expected.get("tool")
     calls = payload.get("tool_calls") or []
     analytics = [call for call in calls if call.get("tool_name") != "resolve_product"]

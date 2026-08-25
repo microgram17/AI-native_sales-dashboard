@@ -43,6 +43,7 @@ class AnalyticsEntity(BaseModel):
     type: EntityType
     id: str | None = None
     name: str
+    category: str | None = None
 
 
 class AnalyticsContext(BaseModel):
@@ -91,7 +92,13 @@ class DisplaySelection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     view_id: str
-    render_as: Literal["default", "table"] = "default"
+    render_as: Literal["default", "table"] = Field(
+        default="default",
+        description=(
+            "Use 'table' only when the user's current message explicitly "
+            "requests a table; otherwise use 'default'."
+        ),
+    )
     measure_keys: list[str] = Field(default_factory=list)
     title: str | None = None
 
@@ -101,7 +108,12 @@ class AgentTurnOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    message: str
+    message: str = Field(
+        description=(
+            "A concise grounded answer of at most three short sentences. "
+            "Never include a Markdown table or reproduce the DataView rows."
+        )
+    )
     displays: list[DisplaySelection] = Field(default_factory=list)
 
 

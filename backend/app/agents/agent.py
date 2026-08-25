@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from google.adk.agents import LlmAgent
@@ -10,6 +11,7 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from google.adk.tools.tool_context import ToolContext
+from google.genai import types
 
 from app.schemas.agent import AgentTurnOutput
 
@@ -58,9 +60,15 @@ Rules:
   "same, but online" or "and in Stockholm", always make a new analytics call
   with the complete updated arguments. Reuse the same named product, period,
   metric, and other filters unless the user changes them.
+- A request to compare a product with "other", "all", or peer products widens
+  the scope. Use sales_rank grouped by product, remove the prior product_ids
+  filter, and filter by the resolved entity.category when available. Never
+  compare a retained single-product scope with itself.
 - When the user compares members of a dimension over time, use one sales_trend
   call with split_by (for example split_by="channel" for online versus
-  physical). Do not make one filtered call per member.
+  physical). Do not make one filtered call per member. If the user explicitly
+  asks for all members, set series_limit=10 instead of relying on the default
+  top-five limit.
 - For a presentation-only follow-up such as "show that as a table", do not call
   an analytics tool. Select reusable view IDs and set render_as="table". Only
   explicit presentation changes may reuse views; scope, period, metric, grain,
@@ -71,9 +79,24 @@ Rules:
 - status="not_found" means an entity could not be matched; status="ambiguous"
   means the user must choose among candidates; status="no_data" means the
   understood query returned no rows.
-- Keep message short. Select only views relevant to the question. Measure keys
-  must exist in the selected view. Use render_as="default" unless the user asks
-  for a table. Give each selected display a natural localized title.
+- The message is a short narrative answer, never a data transport. Use at most
+  three short sentences. Never output a Markdown table, enumerate all rows, or
+  repeat the full tool result; the selected DataViews carry the business data.
+- Treat default_visible as the default presentation policy. For a broad or
+  general overview, select only default-visible views; never select every
+  available view merely because the tool returned it. Select a non-default
+  view only when the user's current message explicitly requests that analysis.
+  For product_overview: "how is it performing?" shows only the current metrics;
+  select trend only for development over time, channel_breakdown only for a
+  channel comparison, and city_breakdown only for a city/location breakdown.
+- Measure keys must exist in the selected view. For categorical and timeseries
+  views, use explicitly requested measures or otherwise the view's declared
+  default_measures; do not select every measure by default. The frontend still
+  offers the other declared measure fields in its metric picker.
+- Use render_as="default" unless the user's current message explicitly asks
+  for a table. A comparison does not imply a table. A timeseries uses
+  render_as="default" unless a table was explicitly requested. Give each
+  selected display a natural localized title.
 - If a successful tool result has useful default-visible views and the user did
   not request a narrower presentation, select those views. Greetings and help
   questions require no tool and no displays.
@@ -170,6 +193,12 @@ def build_sales_agent(
     model: LiteLlm,
     mcp_server_url: str,
 ) -> tuple[LlmAgent, McpToolset]:
+    # ADK's MCP transport otherwise probes Google Application Default
+    # Credentials for an optional mTLS client certificate on every local
+    # request. This server authenticates with its own short-lived Bearer token;
+    # operators that actually deploy mTLS can still override the environment.
+    os.environ.setdefault("GOOGLE_API_USE_CLIENT_CERTIFICATE", "false")
+
     toolset = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             # FastMCP mounts its canonical endpoint without a trailing slash.
@@ -192,6 +221,10 @@ def build_sales_agent(
         tools=[toolset],
         output_schema=AgentTurnOutput,
         output_key="agent_turn_output",
+        generate_content_config=types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=512,
+        ),
         before_tool_callback=enforce_tool_budget,
         after_tool_callback=capture_tool_result,
     )

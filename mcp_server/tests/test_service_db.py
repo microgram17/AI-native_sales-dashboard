@@ -447,6 +447,7 @@ async def test_resolve_product_service_exact_name(service):
     assert result.status == "success"
     assert result.product is not None
     assert result.product.id == "NORD-HOD-011"
+    assert result.product.category == "Hoodies"
 
 
 async def test_resolve_product_service_exact_id_is_case_insensitive(service):

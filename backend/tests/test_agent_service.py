@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
 
 from app.agents.agent import (
@@ -79,7 +80,8 @@ def analytics_result() -> dict:
     }
 
 
-def test_architecture_is_one_native_tool_enabled_agent() -> None:
+def test_architecture_is_one_native_tool_enabled_agent(monkeypatch) -> None:
+    monkeypatch.delenv("GOOGLE_API_USE_CLIENT_CERTIFICATE", raising=False)
     agent, toolset = build_sales_agent(
         LiteLlm(model="openai/gpt-4o-mini", api_key="test"),
         "http://localhost:8001/mcp",
@@ -89,7 +91,10 @@ def test_architecture_is_one_native_tool_enabled_agent() -> None:
     assert agent.output_schema is AgentTurnOutput
     assert agent.before_tool_callback is enforce_tool_budget
     assert agent.after_tool_callback is capture_tool_result
+    assert agent.generate_content_config.temperature == 0
+    assert agent.generate_content_config.max_output_tokens == 512
     assert toolset.connection_params.url == "http://localhost:8001/mcp"
+    assert os.environ["GOOGLE_API_USE_CLIENT_CERTIFICATE"] == "false"
 
 
 def test_mcp_header_comes_only_from_invocation_state() -> None:

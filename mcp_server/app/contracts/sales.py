@@ -123,6 +123,10 @@ class AnalyticsEntity(BaseModel):
     type: EntityType
     id: str | None = None
     name: str
+    category: str | None = Field(
+        default=None,
+        description="Canonical product category when the entity is a product.",
+    )
 
 
 class DataField(BaseModel):

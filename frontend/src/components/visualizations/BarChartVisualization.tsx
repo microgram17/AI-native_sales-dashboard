@@ -174,6 +174,7 @@ export function BarChartVisualization({
         )}
 
         <Tooltip
+          wrapperStyle={{ zIndex: 20 }}
           formatter={(value, name) => [
             formatMetricValue(
               value,

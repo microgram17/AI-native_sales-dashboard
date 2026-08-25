@@ -77,6 +77,7 @@ products = Table(
     _metadata,
     Column("product_id", String),
     Column("product_name", String),
+    Column("category", String),
     Column("supplier_id", String),
 )
 
@@ -321,7 +322,9 @@ class SalesAnalyticsRepository:
         self, *, supplier_id: str, value: str
     ) -> dict[str, Any] | None:
         stmt = select(
-            products.c.product_id, products.c.product_name
+            products.c.product_id,
+            products.c.product_name,
+            products.c.category,
         ).where(
             and_(
                 products.c.supplier_id == supplier_id,
@@ -333,7 +336,11 @@ class SalesAnalyticsRepository:
     async def resolve_product_exact_name(
         self, *, supplier_id: str, value: str
     ) -> list[dict[str, Any]]:
-        stmt = select(products.c.product_id, products.c.product_name).where(
+        stmt = select(
+            products.c.product_id,
+            products.c.product_name,
+            products.c.category,
+        ).where(
             and_(
                 products.c.supplier_id == supplier_id,
                 func.lower(products.c.product_name) == value.lower(),
@@ -351,7 +358,11 @@ class SalesAnalyticsRepository:
         )
         pattern = f"%{escaped}%"
         stmt = (
-            select(products.c.product_id, products.c.product_name)
+            select(
+                products.c.product_id,
+                products.c.product_name,
+                products.c.category,
+            )
             .where(
                 and_(
                     products.c.supplier_id == supplier_id,
@@ -378,6 +389,7 @@ class SalesAnalyticsRepository:
             select(
                 products.c.product_id,
                 products.c.product_name,
+                products.c.category,
             )
             .where(
                 products.c.supplier_id

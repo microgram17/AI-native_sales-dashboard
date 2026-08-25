@@ -770,6 +770,7 @@ class SalesAnalyticsService:
                     type="product",
                     id=exact_id["product_id"],
                     name=exact_id["product_name"],
+                    category=exact_id.get("category"),
                 ),
             )
 
@@ -785,6 +786,7 @@ class SalesAnalyticsService:
                     type="product",
                     id=row["product_id"],
                     name=row["product_name"],
+                    category=row.get("category"),
                 ),
             )
         if len(exact_name) > 1:
@@ -805,6 +807,7 @@ class SalesAnalyticsService:
                     type="product",
                     id=row["product_id"],
                     name=row["product_name"],
+                    category=row.get("category"),
                 ),
             )
         if len(partial) > 1:
@@ -845,6 +848,7 @@ class SalesAnalyticsService:
                     type="product",
                     id=best_row["product_id"],
                     name=best_row["product_name"],
+                    category=best_row.get("category"),
                 ),
             )
 
@@ -872,6 +876,11 @@ class SalesAnalyticsService:
     @staticmethod
     def _candidates(rows: list[dict[str, Any]]) -> list[AnalyticsEntity]:
         return [
-            AnalyticsEntity(type="product", id=row["product_id"], name=row["product_name"])
+            AnalyticsEntity(
+                type="product",
+                id=row["product_id"],
+                name=row["product_name"],
+                category=row.get("category"),
+            )
             for row in rows
         ]

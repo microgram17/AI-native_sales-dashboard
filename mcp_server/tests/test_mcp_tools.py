@@ -254,6 +254,7 @@ async def test_resolve_product_exact_name(mcp_server):
     assert structured["status"] == "success"
     assert structured["product"]["id"] == "NORD-HOD-011"
     assert structured["product"]["name"] == "Minimal Logo Hoodie"
+    assert structured["product"]["category"] == "Hoodies"
 
 
 async def test_resolve_product_ambiguous(mcp_server):

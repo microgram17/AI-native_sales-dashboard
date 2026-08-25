@@ -175,6 +175,8 @@ def register_sales_tools(
         - period_start / period_end: inclusive range; supply both or neither.
           If omitted, the full available range is used.
         - scope: optional filters; empty lists mean no restriction.
+          For a product peer comparison, remove any prior single product_ids
+          filter and use the resolved product category in categories.
         - limit: number of ranked rows, 1–20 (default 10). For a singular
           winner/loser question, pass limit=1. For an explicit top/bottom N
           question, pass limit=N. Do not rely on the default when the requested
@@ -235,7 +237,8 @@ def register_sales_tools(
         - scope: optional filters; empty lists mean no restriction.
         - split_by: optional dimension to split into series (product, category,
           store, city, channel).
-        - series_limit: max number of split series, 1–10 (default 5).
+        - series_limit: max number of split series, 1–10 (default 5). Set this
+          to 10 when the user explicitly asks for all members of the split.
 
         Returns: AnalyticsResult with effective context and one flat timeseries
         view whose rows include optional series identity and all metrics.

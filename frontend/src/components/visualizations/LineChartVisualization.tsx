@@ -197,6 +197,7 @@ export function LineChartVisualization({
           />
 
           <Tooltip
+            wrapperStyle={{ zIndex: 20 }}
             formatter={(value, name) => [
               formatMetricValue(
                 value,
@@ -360,6 +361,7 @@ export function LineChartVisualization({
           )}
 
         <Tooltip
+          wrapperStyle={{ zIndex: 20 }}
           formatter={(value, name) => [
             formatMetricValue(
               value,
